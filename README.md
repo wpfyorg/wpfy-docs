@@ -9,6 +9,10 @@ to public documentation and the tooling used to publish it to WordPress.
 
 ## Content
 
+- `docs/` - project architecture notes, ADRs, command specs, runbooks, memory,
+  and handoff material imported from the application repository
+- `kb/` - VitePress knowledge-base source imported from the application
+  repository
 - `content/getting-started/` - installation and first-site guides
 - `content/commands/` - CLI command reference
 - `content/tutorials/` - task-oriented operational guides
@@ -21,4 +25,3 @@ summary, prerequisites where needed, and commands that can be tested directly.
 
 The WordPress publishing workflow is not selected yet. Markdown is the
 canonical source until that decision is recorded.
-
