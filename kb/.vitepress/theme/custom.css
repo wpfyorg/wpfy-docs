@@ -1,0 +1,136 @@
+:root {
+  --vp-font-family-base: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --vp-font-family-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* MotherDuck palette mapped to VitePress CSS vars */
+  --vp-c-bg: #f4efea;
+  --vp-c-bg-soft: #ffffff;
+  --vp-c-bg-elv: #ffffff;
+  --vp-c-bg-alt: #f4efea;
+
+  --vp-c-text-1: #383838;
+  --vp-c-text-2: #5c5c5c;
+
+  --vp-c-brand-1: #383838;
+  --vp-c-brand-2: #5c5c5c;
+  --vp-c-brand-3: #383838;
+  --vp-c-brand-soft: rgba(56, 56, 56, 0.08);
+
+  --vp-c-border: #383838;
+  --vp-c-divider: #383838;
+  --vp-c-gutter: #f4efea;
+
+  /* Code */
+  --vp-code-block-bg: #ffffff;
+  --vp-code-line-height: 1.7;
+
+  /* Search */
+  --vp-c-text-3: #5c5c5c;
+
+  /* Sidebar */
+  --vp-sidebar-bg-color: #f4efea;
+
+  /* Nav */
+  --vp-nav-bg-color: #f4efea;
+  --vp-nav-height: 64px;
+}
+
+.dark {
+  --vp-c-bg: #1a1a1a;
+  --vp-c-bg-soft: #242424;
+  --vp-c-bg-elv: #242424;
+  --vp-c-bg-alt: #1a1a1a;
+
+  --vp-c-text-1: #f4efea;
+  --vp-c-text-2: #a0a0a0;
+
+  --vp-c-brand-1: #97d4ff;
+  --vp-c-brand-2: #6fc2ff;
+  --vp-c-brand-3: #97d4ff;
+  --vp-c-brand-soft: rgba(151, 212, 255, 0.14);
+
+  --vp-c-border: #383838;
+  --vp-c-divider: #383838;
+  --vp-c-gutter: #1a1a1a;
+
+  --vp-code-block-bg: #242424;
+
+  --vp-sidebar-bg-color: #1a1a1a;
+  --vp-nav-bg-color: #1a1a1a;
+}
+
+/* Typography — uppercase headings like MotherDuck */
+.vp-doc h1, .vp-doc h2, .vp-doc h3 {
+  font-family: var(--vp-font-family-mono);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Sidebar headings */
+.VPSidebarItem .text {
+  font-family: var(--vp-font-family-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+
+/* Nav logo */
+.VPNavBarTitle .title {
+  font-family: var(--vp-font-family-mono);
+  font-weight: 700;
+}
+
+/* Brand buttons */
+.VPButton.brand {
+  border: 2px solid var(--vp-c-text-1) !important;
+  box-shadow: 3px 3px 0 var(--vp-c-text-1);
+  border-radius: 2px;
+  font-family: var(--vp-font-family-mono);
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+/* Code blocks — bordered like MotherDuck */
+.vp-doc div[class*='language-'] {
+  border: 2px solid var(--vp-c-text-1);
+  border-radius: 2px;
+  box-shadow: 3px 3px 0 var(--vp-c-text-1);
+}
+
+/* Inline code */
+.vp-doc :not(pre) > code {
+  background: var(--vp-c-brand-soft);
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 0.9em;
+}
+
+/* Tables — bordered */
+.vp-doc table {
+  border: 2px solid var(--vp-c-text-1);
+}
+.vp-doc th {
+  background: var(--vp-c-text-1);
+  color: var(--vp-c-bg);
+  font-family: var(--vp-font-family-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+.vp-doc td {
+  border: 1px solid var(--vp-c-text-1);
+}
+
+/* Prev/Next footer */
+.VPDocFooter {
+  border-top: 2px solid var(--vp-c-text-1);
+}
+
+/* Sidebar border */
+.VPSidebar {
+  border-right: 2px solid var(--vp-c-text-1);
+}
