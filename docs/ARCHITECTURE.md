@@ -41,7 +41,7 @@
 - DNS/IP preflight runs automatically when `-le` is requested. Failed preflight blocks certificate issuance and file changes.
 - Test overrides: `WPFY_TEST_DNS_IPS` and `WPFY_TEST_PUBLIC_IPS`.
 - `certificate_lifecycle.py` owns DNS/IP preflight, ACME state reads, domain matching, certificate metadata/expiry, and force-renewal via Traefik's `acme.json`.
-- Wildcard SSL not yet supported.
+- Wildcard SSL is Cloudflare-only through Traefik DNS challenge and `wpfy dns cloudflare`.
 
 ### Diagnostics
 - `operational_inspection.py` collects structured aggregate, diagnostic, and security facts. `info`, `debug`, and `secure` retain distinct CLI rendering and exit policies.

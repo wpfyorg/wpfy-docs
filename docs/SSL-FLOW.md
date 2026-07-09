@@ -50,6 +50,7 @@
 - Tell the user to update DNS and retry.
 - Current preflight failure path satisfies these requirements.
 
-## Wildcard Future Path
-- Planned later: wildcard certificates require DNS provider validation, for example `--letsencrypt=wildcard --dns=dns_cf`.
-- IP preflight alone is insufficient for wildcard certificates.
+## Wildcard Path
+- Implemented for Cloudflare DNS: store the token with `wpfy dns cloudflare set --token-stdin`, then use `--letsencrypt wildcard --dns cloudflare`.
+- Base-domain DNS/IP preflight still runs before scaffold/runtime mutation.
+- IP preflight alone is insufficient for wildcard certificates; provider credentials are required.

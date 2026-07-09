@@ -9,7 +9,7 @@ Enable or manage SSL for a site.
 - Implemented: `site ssl <domain> --status` reads Traefik ACME storage and reports issued certificate metadata when available.
 - Implemented: `site ssl <domain> --renew` removes the existing ACME entry and reloads Traefik so it can reissue on the next request.
 - Implemented: domains behind Cloudflare are auto-detected during preflight and issued via the HTTP-01 challenge resolver (`le-http`).
-- Deferred: wildcard SSL requires DNS provider validation.
+- Implemented: wildcard SSL via Cloudflare DNS challenge with `--letsencrypt wildcard --dns cloudflare`.
 - Implemented: preflight, status, renewal, and enable flows now emit sectioned summaries with readable certificate fields and next-step guidance.
 - Implemented: SSL enablement uses the managed-site lifecycle module so preflight always completes before scaffold/runtime mutation and existing flavor/PHP settings are preserved.
 - Implemented: for WordPress flavors, enabling SSL updates WordPress `home` and `siteurl` to `https://<domain>` and returns a non-zero result if either WP-CLI update fails.
@@ -33,6 +33,8 @@ Enable or manage SSL for a site.
 ```bash
 wpfy site create <domain> --wp -le [--proxied|--no-proxied]
 wpfy site ssl <domain> --letsencrypt [--proxied|--no-proxied]
+wpfy dns cloudflare set --token-stdin
+wpfy site ssl <domain> --letsencrypt wildcard --dns cloudflare
 wpfy site ssl <domain> --status
 wpfy site ssl <domain> --renew
 ```
@@ -41,12 +43,15 @@ wpfy site ssl <domain> --renew
 ```bash
 wpfy site create example.com --wp -le              # auto-detects Cloudflare
 wpfy site ssl proxied.example.com --letsencrypt --proxied
+printf '%s\n' '<cloudflare-token>' | wpfy dns cloudflare set --token-stdin
+wpfy site ssl example.com --letsencrypt wildcard --dns cloudflare
 ```
 
 ## Expected Files Touched
 - `--preflight-only` is read-only.
 - `--letsencrypt` updates the site scaffold and registry after DNS/IP preflight passes.
 - Certificates are stored by Traefik in its ACME storage.
+- Cloudflare DNS tokens are stored in `/etc/wpfy/dns-cloudflare.env`, mode `0600`, and are redacted in status/test output.
 
 ## Idempotency Behaviour
 - Preflight-only command is read-only and safe to run repeatedly.
@@ -61,4 +66,4 @@ wpfy site ssl proxied.example.com --letsencrypt --proxied
 
 ## Security Notes
 - Do not call ACME if DNS/IP preflight fails.
-- Wildcard certificates require DNS provider validation in a later path.
+- Wildcard certificates are Cloudflare-only for v1; no generic DNS abstraction is implemented.

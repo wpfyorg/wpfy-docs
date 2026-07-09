@@ -1,5 +1,70 @@
 # Worklog
 
+## 2026-07-09 - CLI VM release Page 9 grouped retention
+- Retained grouped `wpfy site ...` and `wpfy stack ...` commands for this release instead of removing parser branches.
+- Kept `wpfy stack install|remove|purge|migrate|upgrade|status` as the canonical grouped stack namespace.
+- Kept grouped site-only operations (`site ssl`, `site list`, `site info`, `site show`, `site status`) and duplicate grouped site commands for compatibility, while documenting flat `run`, `backup`, `restore`, `wp`, `rm`, and `config` as primary where exact equivalents exist.
+
+## 2026-07-08 - Demyx feature parity build
+- Added local backup retention/prune, explicit latest restore, named S3-compatible storage profiles, remote backup list/restore/delete/prune, and Traefik/ACME edge backup/restore.
+- Added Cloudflare-only wildcard SSL with redacted `wpfy dns cloudflare` config and Traefik DNS resolver labels.
+- Added opt-in helper image pulls for phpMyAdmin, Adminer, and Composer; MySQLTuner skips until a vetted pinned image exists.
+- Kept OpenLiteSpeed/Bedrock, panel/API/UI, automatic SMTP notifications, and host-stack migration out of scope.
+- Verified focused parity tests with `rtk proxy env PYTHONPATH=src pytest tests/test_site_layout.py tests/test_cli.py tests/test_traefik.py tests/test_ssl_flow.py -q`.
+
+## 2026-07-03 - CLI VM release Page 8 validation surface
+- Added split command docs for flat runtime, config, operator, and backup storage/schedule surfaces.
+- Updated the disposable-VPS validation runner so the real install lifecycle now exercises flat creation, runtime, config/refresh, backup/restore, delete, WordPress CLI, cron, SMTP, log cron, and operator utility commands where the flat CLI exists.
+- Reviewed operator run 20260703T102801Z-page8 as a near-pass and tightened the runner so unexpected non-zero exits are recorded, SMTP clear uses `--force`, restore/pre-reboot wait for WordPress readiness, and skipped optional scanners are labelled as skipped rather than full scanner coverage.
+- Kept grouped `stack install|status` and grouped site status/SSL/list probes in validation where grouped namespaces are retained.
+
+## 2026-07-03 - Cron and SMTP operator surface
+- Added `wpfy cron minute|five-minute|hourly|six-hour|daily|weekly` to run due WordPress cron events across managed WordPress sites in sorted order.
+- Added systemd-backed `wpfy cron install|status|disable`, safe custom cron hooks, cron log writing, and `wpfy log cron`.
+- Added `wpfy smtp set|status|test|clear` with `/etc/wpfy/smtp.env` mode `0600`, password stdin/prompt handling, credential redaction, dry-run validation, and explicit test sends.
+- Kept backup automation on the existing `wpfy backup schedule` surface; `wpfy cron daily` does not run backups or forced updates.
+- Verified Page 7 CLI behavior with `rtk proxy env PYTHONPATH=src pytest tests/test_cli.py -q`.
+
+## 2026-07-03 - Backup storage and schedule CLI
+- Added permanent upload-only S3-compatible backup config through `wpfy backup storage set|status|test|clear`.
+- Added one systemd-backed recurring backup timer through `wpfy backup schedule daily|weekly|status|disable`, running `wpfy backup all`.
+- Stored S3-compatible config uses `/etc/wpfy/backup-storage.env` with `0600`; env vars still override stored config; status/test output redacts key values.
+- Verified storage config loading, env precedence, schedule unit/timer rendering, and secret redaction with focused pytest and temp-home CLI QA.
+
+## 2026-07-03 - CLI VM release Page 6 backup restore ergonomics
+- Added local archive listing for backup and restore, verified destination-copy support, upload-only S3-compatible backup uploads, and sorted `backup all` aggregation.
+- Kept local archives canonical, preserved restore validation-before-stop behavior, and deferred retention, restore-latest, remote restore/list/delete, lifecycle policies, scheduling, and Traefik/ACME backup.
+- Verified backup copy/upload/list behavior and CLI aggregation with `rtk proxy env PYTHONPATH=src pytest tests/test_site_layout.py -q` and `rtk proxy env PYTHONPATH=src pytest tests/test_cli.py -q`.
+
+## 2026-07-03 - CLI VM release Page 5 operator commands
+- Added canonical flat operator commands: `wpfy healthcheck`, `motd`, and `utility`.
+- Reused operational inspection and site health helpers; disk/load/password/token/htpasswd utilities use only stdlib and do not mutate site state.
+- Verified parser/help, disk/load thresholds, runtime-skip system warning behavior, single/all-site health exits, secret-safe MOTD rendering, and offline utility generation with `rtk proxy env PYTHONPATH=src pytest tests/test_cli.py -q`.
+
+## 2026-07-03 - CLI VM release Page 4 safe config commands
+- Added canonical flat safe config commands: `wpfy config`, `edit`, and `refresh`.
+- Routed controlled config mutations through `UpdateSiteRequest`/`update_site`; password updates use TTY prompt or `--password-stdin` and do not accept a raw password argument.
+- Verified sanitized config status, editor refusal/success safety, refresh restart behavior, deterministic `refresh all`, invalid/missing site safety, and unmanaged `.env` key preservation with `rtk proxy env PYTHONPATH=src pytest tests/test_cli.py -q`.
+
+## 2026-07-03 - CLI VM release Page 3 runtime commands
+- Added canonical flat runtime commands: `wpfy compose`, `up`, `down`, `exec`, `cp`, and `pull`.
+- Reused `compose_command`, `start_site_runtime`, and `stop_site_runtime`; invalid domains and missing sites return before Docker/Compose helpers run.
+- Verified parser/help, dispatch, missing-site/invalid-domain safety, `down --volumes`, `cp` broad-path rejection, service validation, stderr fallback, and subprocess return-code preservation with `rtk proxy env PYTHONPATH=src pytest tests/test_cli.py -q`.
+
+## 2026-07-03 - CLI VM flat-canonical direction decision
+- Recorded flat CLI as the canonical VM/operator target surface.
+- Reclassified grouped `wpfy site ...` and `wpfy stack ...` commands as compatibility surfaces during migration. Page 9 later retained them for this release.
+
+## 2026-07-03 - CLI VM release Page 2 flat aliases
+- Added top-level shortcuts for existing grouped behavior: `wpfy run`, `backup`, `restore`, `rm`, `wp`, and `version`.
+- Preserved grouped `wpfy site ...` commands at the time; Page 2 is now documented as the first migration step toward the flat-canonical CLI.
+- Verified alias parser/help, dispatch, `rm` non-TTY safety, WP-CLI command construction, and version output with `rtk proxy env PYTHONPATH=src pytest tests/test_cli.py -q`.
+
+## 2026-07-03 - CLI VM release Page 1 baseline
+- Added `docs/CLI-VM-RELEASE-MATRIX.md` with all 24 planned command labels mapped to existing grouped commands, planned aliases, planned new commands, or current baseline commands.
+- Captured current help output for `wpfy --help`, `wpfy site --help`, `wpfy stack --help`, and `wpfy log --help` in `/Users/arnab/Desktop/_Projects/wpfy-pvt/.omo/evidence/task-1-wpfy-cli-vm-release-five-hour-pages.txt`.
+- Verified the parser baseline with `rtk proxy env PYTHONPATH=src pytest tests/test_cli.py -q`: 40 passing tests, plus direct CLI checks for `log --help` and unknown-command behavior.
+
 ## 2026-06-30 - Repository split refresh
 - Fast-forwarded `/Users/arnab/Desktop/_Projects/wpfy-pvt` `main` to `origin/main` at `59bb078`.
 - Re-ran the split on `codex/split-code-website-docs` after the pull.
