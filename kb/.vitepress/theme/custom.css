@@ -1,136 +1,224 @@
 :root {
-  --vp-font-family-base: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --vp-font-family-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --vp-font-family-base: 'Inter', Arial, ui-sans-serif, system-ui, sans-serif;
+  --vp-font-family-mono: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
 
-  /* MotherDuck palette mapped to VitePress CSS vars */
-  --vp-c-bg: #f4efea;
-  --vp-c-bg-soft: #ffffff;
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-soft: #eeece7;
   --vp-c-bg-elv: #ffffff;
-  --vp-c-bg-alt: #f4efea;
+  --vp-c-bg-alt: #f1f5ff;
 
-  --vp-c-text-1: #383838;
-  --vp-c-text-2: #5c5c5c;
+  --vp-c-text-1: #212121;
+  --vp-c-text-2: #616161;
 
-  --vp-c-brand-1: #383838;
-  --vp-c-brand-2: #5c5c5c;
-  --vp-c-brand-3: #383838;
-  --vp-c-brand-soft: rgba(56, 56, 56, 0.08);
+  --vp-c-brand-1: #1863dc;
+  --vp-c-brand-2: #003c33;
+  --vp-c-brand-3: #17171c;
+  --vp-c-brand-soft: rgba(24, 99, 220, 0.10);
 
-  --vp-c-border: #383838;
-  --vp-c-divider: #383838;
-  --vp-c-gutter: #f4efea;
+  --vp-c-border: #d9d9dd;
+  --vp-c-divider: #e5e7eb;
+  --vp-c-gutter: #eeece7;
 
-  /* Code */
-  --vp-code-block-bg: #ffffff;
+  --vp-code-block-bg: #17171c;
+  --vp-code-block-color: #ffffff;
   --vp-code-line-height: 1.7;
 
-  /* Search */
-  --vp-c-text-3: #5c5c5c;
+  --vp-c-text-3: #93939f;
 
-  /* Sidebar */
-  --vp-sidebar-bg-color: #f4efea;
+  --vp-sidebar-bg-color: #ffffff;
 
-  /* Nav */
-  --vp-nav-bg-color: #f4efea;
+  --vp-nav-bg-color: rgba(255, 255, 255, 0.92);
   --vp-nav-height: 64px;
+  --wpfy-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --vp-home-hero-name-color: #17171c;
+  --vp-home-hero-name-background: transparent;
+  --vp-home-hero-image-background-image: linear-gradient(135deg, #edfce9, #f1f5ff);
+  --vp-home-hero-image-filter: blur(56px);
 }
 
 .dark {
-  --vp-c-bg: #1a1a1a;
-  --vp-c-bg-soft: #242424;
-  --vp-c-bg-elv: #242424;
-  --vp-c-bg-alt: #1a1a1a;
+  --vp-c-bg: #17171c;
+  --vp-c-bg-soft: #071829;
+  --vp-c-bg-elv: #212121;
+  --vp-c-bg-alt: #003c33;
 
-  --vp-c-text-1: #f4efea;
-  --vp-c-text-2: #a0a0a0;
+  --vp-c-text-1: #ffffff;
+  --vp-c-text-2: #d9d9dd;
 
-  --vp-c-brand-1: #97d4ff;
-  --vp-c-brand-2: #6fc2ff;
-  --vp-c-brand-3: #97d4ff;
-  --vp-c-brand-soft: rgba(151, 212, 255, 0.14);
+  --vp-c-brand-1: #ffad9b;
+  --vp-c-brand-2: #ff7759;
+  --vp-c-brand-3: #ffffff;
+  --vp-c-brand-soft: rgba(255, 119, 89, 0.16);
 
-  --vp-c-border: #383838;
-  --vp-c-divider: #383838;
-  --vp-c-gutter: #1a1a1a;
+  --vp-c-border: rgba(255, 255, 255, 0.18);
+  --vp-c-divider: rgba(255, 255, 255, 0.14);
+  --vp-c-gutter: #071829;
 
-  --vp-code-block-bg: #242424;
+  --vp-code-block-bg: #071829;
 
-  --vp-sidebar-bg-color: #1a1a1a;
-  --vp-nav-bg-color: #1a1a1a;
+  --vp-sidebar-bg-color: #17171c;
+  --vp-nav-bg-color: rgba(23, 23, 28, 0.92);
 }
 
-/* Typography — uppercase headings like MotherDuck */
+:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
+button,
+a {
+  touch-action: manipulation;
+}
+
 .vp-doc h1, .vp-doc h2, .vp-doc h3 {
-  font-family: var(--vp-font-family-mono);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-family: 'Space Grotesk', Inter, Arial, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-wrap: balance;
 }
 
-/* Sidebar headings */
+.vp-doc h1 {
+  font-size: 3.4rem;
+  line-height: 1;
+}
+
+.vp-doc h1 code {
+  background: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font: inherit !important;
+}
+
+.vp-doc h2 {
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 32px;
+}
+
+.vp-doc p,
+.vp-doc li {
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
 .VPSidebarItem .text {
-  font-family: var(--vp-font-family-mono);
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
-/* Nav logo */
 .VPNavBarTitle .title {
-  font-family: var(--vp-font-family-mono);
-  font-weight: 700;
+  font-family: 'Space Grotesk', Inter, Arial, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
 }
 
-/* Brand buttons */
 .VPButton.brand {
-  border: 2px solid var(--vp-c-text-1) !important;
-  box-shadow: 3px 3px 0 var(--vp-c-text-1);
-  border-radius: 2px;
-  font-family: var(--vp-font-family-mono);
-  text-transform: uppercase;
-  font-size: 0.8rem;
-  letter-spacing: 0.02em;
+  border: 1px solid #17171c !important;
+  box-shadow: none;
+  border-radius: 32px;
+  background: #17171c !important;
+  font-size: 0.9rem;
+  letter-spacing: 0;
 }
 
-/* Code blocks — bordered like MotherDuck */
+.VPButton,
+.VPFeature {
+  transition:
+    transform 160ms var(--wpfy-ease-out),
+    border-color 160ms var(--wpfy-ease-out),
+    background-color 160ms var(--wpfy-ease-out),
+    color 160ms var(--wpfy-ease-out);
+}
+
+.VPButton:active {
+  transform: scale(0.98);
+}
+
 .vp-doc div[class*='language-'] {
-  border: 2px solid var(--vp-c-text-1);
-  border-radius: 2px;
-  box-shadow: 3px 3px 0 var(--vp-c-text-1);
+  border: 1px solid var(--vp-c-border);
+  border-radius: 8px;
+  box-shadow: none;
+  overflow-x: auto;
 }
 
-/* Inline code */
 .vp-doc :not(pre) > code {
   background: var(--vp-c-brand-soft);
   padding: 2px 6px;
-  border-radius: 2px;
+  border-radius: 4px;
   font-size: 0.9em;
 }
 
-/* Tables — bordered */
 .vp-doc table {
-  border: 2px solid var(--vp-c-text-1);
+  border: 1px solid var(--vp-c-border);
+  border-radius: 8px;
 }
 .vp-doc th {
-  background: var(--vp-c-text-1);
-  color: var(--vp-c-bg);
-  font-family: var(--vp-font-family-mono);
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
+  background: #eeece7;
+  color: #212121;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 .vp-doc td {
-  border: 1px solid var(--vp-c-text-1);
+  border: 1px solid var(--vp-c-divider);
 }
 
-/* Prev/Next footer */
 .VPDocFooter {
-  border-top: 2px solid var(--vp-c-text-1);
+  border-top: 1px solid var(--vp-c-divider);
 }
 
-/* Sidebar border */
 .VPSidebar {
-  border-right: 2px solid var(--vp-c-text-1);
+  border-right: 1px solid var(--vp-c-divider);
+}
+
+.VPFeature {
+  border: 1px solid #f2f2f2 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .VPFeature:hover {
+    border-color: var(--vp-c-border) !important;
+    transform: translateY(-2px);
+  }
+
+  .VPButton:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.VPFeature:active {
+  transform: scale(0.99);
+}
+
+.VPHome .main {
+  padding-top: 72px;
+}
+
+.VPHomeHero .text {
+  font-family: 'Space Grotesk', Inter, Arial, ui-sans-serif, system-ui, sans-serif;
+  font-size: 3.4rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.VPHomeHero .tagline {
+  color: #616161;
+}
+
+@media (max-width: 640px) {
+  .vp-doc h1,
+  .VPHomeHero .text {
+    font-size: 2.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

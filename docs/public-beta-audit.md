@@ -38,7 +38,7 @@ Searches performed: secrets patterns (password/secret/token/api_key/PRIVATE KEY/
 | # | Finding | Location | Status |
 |---|---|---|---|
 | M1 | **Install path pipes a script from the mutable `main` ref** (`curl … /main/install.sh \| sudo bash`). Anyone compromising the branch could alter installs. The installer already supports pinning (`WPFY_REF`, `WPFY_SOURCE_SHA256`) but this was undocumented. | `install.sh`, `README.md` | **Mitigated in docs**: README now documents the risk, a review-first flow, and checksum/ref pinning. Full fix (tagged releases with published checksums as default path) tracked in `ROADMAP.md` → human follow-up. |
-| M2 | **`wpfy stack purge` removes the edge-proxy Compose project without a confirmation prompt.** | `src/wpfy/cli.py` (`handle_stack_purge`) | **Documented** in README *Known limitations*. Adding a prompt is a small code change left to maintainers (kept out of this docs-focused pass). |
+| M2 | **`wpfy stack purge` previously removed the edge-proxy Compose project without an explicit safety gate.** | `src/wpfy/stack.py`, `src/wpfy/cli.py` | **Fixed in Phase D**: purge now requires `--force` and exits nonzero before mutation when omitted. |
 | M3 | **Version inconsistency:** `pyproject.toml` declares `1.0.0` while the CLI reports `wpfy 0.1.0` (`src/wpfy/__init__.py`). A "1.0.0" label also contradicts beta positioning. | `pyproject.toml:8`, `src/wpfy/__init__.py:5` | **Open — human decision required.** Recommend a single canonical beta version (e.g. `1.0.0-beta.1` or `0.9.x`) set in both places before tagging a release. |
 
 ### Low
@@ -103,7 +103,7 @@ The previous README was 35 lines and lacked: a beta warning, prerequisites, quic
 
 - [x] Rewrite `README.md` with beta notice, accurate commands, prerequisites, limitations — **done (this pass)**.
 - [x] Add `SECURITY.md` with a private reporting channel — **done**; *human action:* enable **Private vulnerability reporting** in GitHub repo settings so the advisory link works.
-- [x] Document the destructive-command behaviors (`stack purge` no prompt; `site delete` non-interactive) — **done** in README.
+- [x] Require explicit `--force` for `stack purge` and document the remaining non-interactive `site delete` behavior — **done**.
 - [x] Document installer mutable-ref risk and pinning (`WPFY_REF`/`WPFY_SOURCE_SHA256`) — **done** in README.
 - [ ] **Resolve version inconsistency (M3)**: align `pyproject.toml` and `src/wpfy/__init__.py` on one beta version string — *human decision*.
 - [ ] **Verify `ghcr.io/wpfyorg/php-fpm` images are public** — `site create` fails for users if pulls require auth — *human verification*.
@@ -115,7 +115,7 @@ The previous README was 35 lines and lacked: a beta warning, prerequisites, quic
 - [x] CI running the test suite (`.github/workflows/tests.yml`) — **done**.
 - [x] Defensive `.env*` entries in `.gitignore` — **done**.
 - [ ] Tag a first beta release (e.g. `v1.0.0-beta.1`) and publish its archive SHA-256 so the README pinning instructions have concrete values to use.
-- [ ] Add a confirmation prompt to `wpfy stack purge` (small code change, maintainer call — see M2).
+- [x] Add an explicit destructive-action gate to `wpfy stack purge` — **done in Phase D with required `--force`**.
 - [ ] Set repository description and topics (see §8) — repo settings, not files.
 
 ### Nice to have (post-beta acceptable)
@@ -137,4 +137,3 @@ Items a maintainer should personally confirm before announcing the beta:
 4. **Run one full real-world cycle** on a throwaway VPS: install → `stack install` → `site create --wp -le` → `backup` → `restore` → `sftp --enable` → `site delete`.
 5. **Set repo description + topics** per §8.
 6. **Review this audit and the new docs** for tone/claims you're comfortable standing behind — particularly the isolation-model language in README's *Safety model* section.
-7. **Decide on the `stack purge` confirmation prompt** (M2).

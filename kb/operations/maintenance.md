@@ -5,20 +5,21 @@ Toggle maintenance mode for a site.
 ## Syntax
 
 ```bash
-wpfy maintenance <domain> --on
-wpfy maintenance <domain> --off
+wpfy maintenance <domain> --enable
+wpfy maintenance <domain> --disable
+wpfy maintenance <domain> --status
 ```
 
 ## Examples
 
 ```bash
-wpfy maintenance example.com --on
-wpfy maintenance example.com --off
+wpfy maintenance example.com --enable
+wpfy maintenance example.com --disable
 ```
 
 ## Expected Behavior
 
-Enables or disables a maintenance page served by Nginx. When active, visitors see a maintenance notice instead of the site. Useful during updates or migrations.
+`--enable` stops the app container; `--disable` starts it; `--status` (also the default) is read-only. The flags are mutually exclusive. Registry state is updated only after the matching Compose action succeeds, so a runtime failure returns non-zero and leaves recorded state unchanged.
 
 ## Related Commands
 

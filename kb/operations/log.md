@@ -23,7 +23,7 @@ wpfy log reset <domain>
 | `--php` | bool | PHP-FPM logs |
 | `--mysql` | bool | MariaDB logs |
 | `-f`, `--follow` | bool | Follow log output (tail -f) |
-| `--lines` | int | Number of lines to show (default: 50) |
+| `--lines` | int | Number of lines to show (default: 100) |
 
 ## Examples
 

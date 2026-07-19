@@ -46,8 +46,9 @@ wpfy site ssl example.com --preflight-only
 - Warns when expiry is < 30 days
 
 **`--renew`:**
+- Confirms an ACME backup copy before changing `acme.json`
 - Removes domain entry from `acme.json`
-- Reloads Traefik so it reissues on next request
+- Reloads Traefik only after a confirmed rewrite; partial failures report whether ACME changed and that the backup remains
 
 ## Proxied Domains (Cloudflare)
 

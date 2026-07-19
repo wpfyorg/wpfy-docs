@@ -14,7 +14,10 @@ Create a WordPress site with per-site containers and volumes.
 5. Verify `wpfy site status example.com`.
 6. Visit the site through the edge proxy.
 7. Expect the create command to show sectioned progress for scaffold, bootstrap, runtime, and WordPress provisioning steps.
+8. Expect fresh bootstrap to report the verified WordPress version before runtime starts.
 
 ## Notes
 - Use `-le` only when DNS already points to the VPS.
 - Re-running `site create` does not rotate the WordPress admin password once WordPress is installed.
+- Release metadata, digest, or archive mismatch returns non-zero before extraction. Correct transient upstream/network problems and rerun; the scaffold and secrets are reused.
+- WordPress.org publishes SHA-1 for release tarballs. wpfy uses it for mismatch/corruption detection, not signature verification.

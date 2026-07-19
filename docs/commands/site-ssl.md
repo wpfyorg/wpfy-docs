@@ -9,11 +9,12 @@ Enable or manage SSL for a site.
 - Implemented: `site ssl <domain> --status` reads Traefik ACME storage and reports issued certificate metadata when available.
 - Implemented: `site ssl <domain> --renew` removes the existing ACME entry and reloads Traefik so it can reissue on the next request.
 - Implemented: domains behind Cloudflare are auto-detected during preflight and issued via the HTTP-01 challenge resolver (`le-http`).
-- Deferred: wildcard SSL requires DNS provider validation.
+- Implemented: wildcard SSL via Cloudflare DNS challenge with `--letsencrypt wildcard --dns cloudflare`.
 - Implemented: preflight, status, renewal, and enable flows now emit sectioned summaries with readable certificate fields and next-step guidance.
 - Implemented: SSL enablement uses the managed-site lifecycle module so preflight always completes before scaffold/runtime mutation and existing flavor/PHP settings are preserved.
 - Implemented: for WordPress flavors, enabling SSL updates WordPress `home` and `siteurl` to `https://<domain>` and returns a non-zero result if either WP-CLI update fails.
 - Implemented: preflight, ACME state reads, case-insensitive domain matching, metadata, expiry, and renewal share the `certificate_lifecycle.py` interface.
+- Implemented: renewal confirms ACME backup creation and copy before rewrite, confirms rewrite before reload, and reports rewrite/reload partial failures truthfully while preserving the backup.
 - Implemented: enabling SSL (via `site create -le`, `site update -le`, or `site ssl --letsencrypt`) requires a valid ACME contact email before preflight runs. The effective email is the one already written to the Traefik scaffold (`traefik.yml`), else `WPFY_ACME_EMAIL`; the historical `admin@localhost` default is rejected because Let's Encrypt refuses it at registration. Fix by setting `WPFY_ACME_EMAIL=you@example.com` and re-running `wpfy stack install --nginx`.
 
 ## Proxied domains (Cloudflare)
@@ -33,6 +34,8 @@ Enable or manage SSL for a site.
 ```bash
 wpfy site create <domain> --wp -le [--proxied|--no-proxied]
 wpfy site ssl <domain> --letsencrypt [--proxied|--no-proxied]
+wpfy dns cloudflare set --token-stdin
+wpfy site ssl <domain> --letsencrypt wildcard --dns cloudflare
 wpfy site ssl <domain> --status
 wpfy site ssl <domain> --renew
 ```
@@ -41,12 +44,15 @@ wpfy site ssl <domain> --renew
 ```bash
 wpfy site create example.com --wp -le              # auto-detects Cloudflare
 wpfy site ssl proxied.example.com --letsencrypt --proxied
+printf '%s\n' '<cloudflare-token>' | wpfy dns cloudflare set --token-stdin
+wpfy site ssl example.com --letsencrypt wildcard --dns cloudflare
 ```
 
 ## Expected Files Touched
 - `--preflight-only` is read-only.
 - `--letsencrypt` updates the site scaffold and registry after DNS/IP preflight passes.
 - Certificates are stored by Traefik in its ACME storage.
+- Cloudflare DNS tokens are stored in `/etc/wpfy/dns-cloudflare.env`, mode `0600`, and are redacted in status/test output.
 
 ## Idempotency Behaviour
 - Preflight-only command is read-only and safe to run repeatedly.
@@ -57,8 +63,9 @@ wpfy site ssl proxied.example.com --letsencrypt --proxied
 - DNS A/AAAA records do not point to this VPS.
 - Public IP detection fails.
 - Traefik ACME storage is unavailable.
+- ACME backup, rewrite, or Traefik reload fails; later mutation steps are blocked and partial state is reported.
 - ACME client failure after preflight passes.
 
 ## Security Notes
 - Do not call ACME if DNS/IP preflight fails.
-- Wildcard certificates require DNS provider validation in a later path.
+- Wildcard certificates are Cloudflare-only for v1; no generic DNS abstraction is implemented.

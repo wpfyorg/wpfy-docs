@@ -3,7 +3,8 @@
 ## Implemented
 - Per-site `.env` files are written with `0600` permissions.
 - Backup archives are written with `0600` permissions under `/var/lib/wpfy/backups/<site>/`.
-- Restore validates backup archive members before extraction and rejects path traversal, absolute paths, links, device files, and archives rooted at a different domain.
+- Database SQL is staged with `0600`, embedded once in a verified archive, and removed as a loose file on success or failure.
+- Restore validates backup archive members before extraction and rejects path traversal, absolute paths, links, device files, non-directory site roots, archives rooted at a different domain, and database-volume payloads under `db-data/`.
 - SFTP is an optional per-site sidecar, bound to a loopback-only host port and mounted only to that site's `./app` directory.
 - SFTP status reports whether a password is configured but does not print the password value.
 - `wpfy secure` audits per-site file permissions and container security basics, including privileged mode, no-new-privileges, dropped raw networking capability, resource limits, log rotation, and host port bindings.
@@ -32,11 +33,16 @@
 ## Secrets Handling
 - Implemented: generated passwords for DB and WordPress salts.
 - Implemented: per-site `.env` and SFTP secrets are stored in root-readable per-site files.
+- Implemented: stored SMTP, Cloudflare DNS, and S3 secret config reads reject symlink-backed files and shape expected filesystem failures without tracebacks.
+- Implemented: exact configured values are redacted longest-first from SMTP, DNS, S3, and WordPress failure text, ignoring empty/duplicate values. Key-based environment sanitization and SFTP field-pattern masking remain separate controls.
 - Open question: exact secret storage mechanism.
 
 ## Backup Safety
 - Implemented: backups avoid world-readable archive permissions.
+- Implemented: strict pre-delete backups require database completeness; failed/skipped backup or runtime-stop prerequisites cannot be bypassed by `--force`.
 - Implemented: restore validates archive paths before extraction and remains domain-bound.
+- Implemented: verified site/edge archives upload as fixed-length signed file streams whose canonical headers match the declared SigV4 `SignedHeaders`; upload failure preserves the local archive. Remote restore streams to a mode-`0600` temporary file, rejects malformed or truncated archives and `db-data/` payloads before runtime mutation, rejects symlinks in the live restore tree, replaces archive-owned entries with descriptor-relative no-follow operations while preserving the live database volume, and removes the temporary file on every exit path.
+- Limitation: S3-compatible archive upload is a single request without multipart or resume support.
 - Planned: more explicit restore confirmation or pre-restore backup workflow for existing live sites.
 
 ## Hardening
@@ -47,4 +53,5 @@
 - Implemented: `install.sh` defaults to a GitHub source archive for `WPFY_REF` and allows `WPFY_SOURCE_ARCHIVE` for release validation.
 - Implemented: `install.sh` can verify the source archive with `WPFY_SOURCE_SHA256` when a release checksum is published or supplied by the operator.
 - Implemented: PHP-FPM images are built from the public repository workflow for supported PHP tags.
-- Residual v1 risk: WordPress core and WP-CLI image/artifact trust still depends on upstream distribution channels; checksum or signature verification remains future hardening.
+- Implemented: managed site environments and scaffold files use descriptor-relative no-follow reads/writes and reject symlinks before exposing secrets or changing external targets; fresh WordPress core bootstrap applies the same boundary to health/core files. Ownership failures gate create, update, and SSL runtime starts. Fresh core matches a versioned official tarball against WordPress.org's published SHA-1 before extraction. Partial retries, including a missing healthcheck, are blocked before mutation while the site runtime could change the destination. The SHA-1 check detects mismatch/corruption but is not signature or provenance verification.
+- Residual v1 risk: WP-CLI image/artifact trust still depends on upstream distribution channels; independent signature verification remains future hardening.

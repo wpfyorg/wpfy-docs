@@ -20,7 +20,7 @@ Run the release-validation flow against a disposable Ubuntu VPS while keeping ev
 3. Secrets are appended only to `/root/wpfy-validation/<run-id>/secrets.txt` with mode `0600`.
 
 ## Reboot checkpoint
-1. Before reboot, confirm `96-pre-reboot.txt` exists and looks sane.
+1. Before reboot, confirm `96-pre-reboot.txt` exists and has no unexpected `[exit N]`, `result: FAIL`, or failing site health summary.
 2. Reboot the VPS.
 3. After reconnecting, run:
    `WPFY_VALIDATION_RUN_ID=<run-id> bash /root/wpfy-validation/<run-id>/vps-release-validation-remote.sh post-reboot`
@@ -33,3 +33,5 @@ Run the release-validation flow against a disposable Ubuntu VPS while keeping ev
 - The remote runner is intentionally phase-based. Re-run only the failed phase after fixing an issue.
 - `all` excludes the reboot continuation and the public-install repeat because they require explicit operator intent and, in the public case, a clean target.
 - The local bundle excludes `.git`, `.context`, caches, and build artifacts so the staged archive matches the intended release surface closely enough for validation.
+- Treat `validation-failures.txt` as the primary failure ledger, but also scan must-pass evidence files for unexpected `[exit N]`, `result: FAIL`, `smtp clear aborted`, and unredacted secret values before declaring VM readiness.
+- Optional scanners may be skipped on minimal VPS images; skipped scanner output is evidence that the phase ran, not evidence that those scanner tools covered the system.

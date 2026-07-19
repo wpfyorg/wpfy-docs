@@ -17,6 +17,7 @@ wpfy site delete example.com
 ## Expected Behavior
 
 - Stops site runtime (`docker compose down`)
+- Creates a strict, database-complete safety backup before stopping runtime
 - Removes site scaffold from `/opt/wpfy/sites/<domain>/`
 - Removes registry entry from `/var/lib/wpfy/sites.json`
 - Does NOT remove backups (they stay under `/var/lib/wpfy/backups/<domain>/`)
@@ -26,7 +27,10 @@ wpfy site delete example.com
 | Condition | Behavior |
 |-----------|----------|
 | Site not found | `site not found` error |
-| Runtime stop fails | Deletion continues, scaffold removed |
+| Backup fails, is skipped, or lacks required SQL | Deletion stops; runtime and files are kept |
+| Runtime stop fails or is skipped | Deletion stops; scaffold and registry are kept |
+
+`--force` skips the confirmation prompt only. It cannot bypass either safety gate.
 
 ## Related Commands
 
