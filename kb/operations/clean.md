@@ -6,7 +6,7 @@ Clear site caches.
 
 ```bash
 wpfy clean <domain> --all
-wpfy clean <domain> --nginx
+wpfy clean <domain>
 wpfy clean <domain> --redis
 wpfy clean <domain> --opcache
 ```
@@ -16,7 +16,6 @@ wpfy clean <domain> --opcache
 | Flag | Type | Description |
 |------|------|-------------|
 | `--all` | bool | Clear all caches |
-| `--nginx` | bool | Clear Nginx FastCGI, proxy, and uwsgi caches |
 | `--redis` | bool | Run `FLUSHALL` on Redis |
 | `--opcache` | bool | Reset PHP OPcache via `kill -USR2` |
 
@@ -29,7 +28,7 @@ wpfy clean example.com --redis
 
 ## Expected Behavior
 
-Each flag targets a specific cache layer inside the site's containers. No files are deleted. Site stays running.
+No flag defaults to Nginx FastCGI, proxy, and uwsgi cache. Other flags target their named layer; `--all` selects all three. No site files are deleted. Any requested execution failure returns non-zero while successful and skipped per-site messages remain visible.
 
 ## Related Commands
 

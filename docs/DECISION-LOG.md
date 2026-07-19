@@ -92,10 +92,24 @@
 - Status: Accepted.
 
 ## 2026-06-07: Deep domain modules for persisted state and inspection
-- Decision: Make site definition, certificate lifecycle, and operational inspection explicit deep modules. See ADR 0010.
+- Decision: Make site definition, certificate lifecycle, and operational inspection explicit deep modules. Path/env primitives and Docker/Compose runtime inspection were later split into `site_paths.py` and `site_runtime.py` without changing mutation ownership. See ADR 0010.
 - Reason: SFTP state edits, certificate matching, and operational probes leaked across callers and could drift independently.
 - Alternatives considered: Keep caller-side coordination and add repair/formatting helpers.
 - Consequence: Persisted site representations regenerate from one definition; certificate state has one owner; CLI commands render structured inspection facts.
+- Status: Accepted.
+
+## 2026-07-18: Deep ownership for stack, cache, and site runtime operations
+- Decision: Extend ADR 0010 so `stack.py` owns shared-stack operations, `cache_operations.py` owns cache selection/execution, and public `site_runtime.py` APIs own logs, reset, WP-CLI, HTTP probes, and service readiness. CLI and panel retain validation, rendering, and transport policy.
+- Reason: Raw Docker/Compose orchestration and failure interpretation were duplicated across CLI and panel, making destructive and automation outcomes drift-prone.
+- Alternatives considered: Keep orchestration in handlers; add a second log adapter; introduce a command bus or CLI framework.
+- Consequence: `stack purge` requires `--force` and propagates teardown failures; requested cache failures return non-zero; CLI/panel log and WP surfaces share runtime construction without new dependencies.
+- Status: Accepted.
+
+## 2026-07-18: Consolidated configuration and operational primitives
+- Decision: Extend ADR 0010 with canonical no-follow stored-config reads, exact-value redaction, and shared mechanical systemd lifecycle operations. SMTP/DNS/S3 validation, cron/backup policy, CLI interaction, key-based sanitization, and SFTP pattern masking remain in their existing domains.
+- Reason: Duplicated parsers, replacement loops, and scheduler mechanics could drift on symlinks, overlapping secrets, and partial failures.
+- Alternatives considered: New configuration framework, universal secret object, systemd D-Bus integration, or continued caller duplication.
+- Consequence: Symlink-backed secret config reads fail cleanly; overlapping values redact consistently; systemd cleanup targets only explicit owned paths; no dependency or CLI syntax changes.
 - Status: Accepted.
 
 ## 2026-06-08: Publish PHP images only from the public mirror

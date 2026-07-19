@@ -6,6 +6,7 @@ Check for new WPFY CLI releases.
 
 ```bash
 wpfy update --check
+wpfy update --force
 ```
 
 ## Examples
@@ -16,9 +17,12 @@ wpfy update --check
 
 ## Expected Output
 
-- Current installed version
-- Latest available version from GitHub releases
-- Upgrade instructions if newer version exists
+- Installed version and latest published version from PyPI
+- Equal versions are reported as up to date
+- Different versions are reported neutrally without guessing which is newer
+- `--force` explicitly runs the pip upgrade command; it does not claim a version transition unless proven
+
+`--check` and `--force` are mutually exclusive.
 
 ## Related Commands
 

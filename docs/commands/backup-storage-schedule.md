@@ -47,7 +47,9 @@ wpfy backup schedule disable
 
 ## Security Notes
 - The stored access key and secret key are redacted in status/test output.
+- Stored default/profile config files are read without following symlinks; rejected reads return a controlled configuration error.
+- Schedule disable removes managed unit files only after `systemctl disable --now` succeeds, then reloads systemd.
 - Environment variables override the default stored config only.
 - Remote delete/prune require `--force` and operate only under `<prefix>/<domain>/`.
-- Remote restore downloads to a temp file and validates the archive before touching live runtime.
+- Remote restore downloads to a private temp file, rejects malformed or truncated archives before touching live runtime, and removes the temp file on every exit path.
 - Edge restore validates archive members before writing Traefik config or ACME state.

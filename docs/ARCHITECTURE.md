@@ -2,18 +2,16 @@
 
 ## Implemented
 - `wpfy` is a Python package using argparse. `cli.py` parses and renders commands; managed-site lifecycle, site definition, certificate lifecycle, and operational inspection are deep modules over the lower-level runtime adapters.
+- `stack.py` owns shared-stack operations; `cache_operations.py` owns cache targeting/execution; `site_runtime.py` owns site Compose execution, logs/reset, WP-CLI modes, HTTP probes, and service readiness. CLI and panel consume structured results.
+- Stored SMTP, Cloudflare DNS, and S3 config reuse `site_paths.py` no-follow env reads. `redaction.py` owns exact-value error redaction, while `systemd.py` owns mechanical unit lifecycle ordering for cron and backup schedules; domain policy stays in those schedulers.
 - All CLI commands have real implementations covering site lifecycle, stack management, diagnostics, caching, logging, and WP-CLI passthrough.
 - A downloadable Bash installer bootstraps Ubuntu VPS hosts with Docker, Compose plugin, core directories, source sync, a `/opt/wpfy/venv` package install, and a `/usr/local/bin/wpfy` wrapper. Supports `--dry-run` and `WPFY_DRY_RUN=1`.
 
 ### Site Runtime
 - `site_lifecycle.py` is the interface used by CLI handlers for site create, update, and SSL enablement. It owns preflight-before-mutation ordering, desired `SiteDefinition` construction, scaffold/runtime sequencing, WordPress provisioning, and registry updates.
 - Each site is a per-site Docker Compose project under `/opt/wpfy/sites/<domain>/`.
-<<<<<<< HEAD
-- `compose.yaml` and `.env` are generated idempotently from a `SiteSpec` dataclass. Runtime containers include `web` (nginx+PHP), `app` (PHP-FPM), `db` (MariaDB, when mysql flavor), `redis` (when wpredis flavor), and `wpcli` (WP-CLI profile).
-=======
 - `compose.yaml`, `.env`, and registry metadata are generated idempotently from one `SiteDefinition`. It includes flavor, PHP, SSL, Redis, and optional SFTP state.
 - SFTP runtime management allocates ports and starts/stops the sidecar, but does not patch YAML or persisted metadata independently.
->>>>>>> origin/main
 - PHP version selected per site via Docker image tag: `ghcr.io/wpfyorg/php-fpm:8.4` by default, with explicit support for `7.4`, `8.0`, `8.1`, `8.2`, and `8.3` for compatibility, upgrade, and downgrade flows.
 - Site isolation: dedicated Compose project, network, volumes, database, and optional Redis per site. No shared PHP, DB, Redis, or writable app volumes.
 - Site bootstrap populates `app/` with WordPress-style filesystem and `healthz.html` for HTTP probes.
@@ -45,8 +43,8 @@
 
 ### Diagnostics
 - `operational_inspection.py` collects structured aggregate, diagnostic, and security facts. `info`, `debug`, and `secure` retain distinct CLI rendering and exit policies.
-- `wpfy clean` clears nginx caches, Redis, and PHP OPcache across sites.
-- `wpfy log show`/`log reset` for container log management.
+- `wpfy clean` delegates per-site nginx, Redis, and PHP OPcache selection/execution to `cache_operations.py`; failed requested work returns non-zero.
+- `wpfy log show`/`log reset` and CLI/panel WP-CLI execution delegate to public `site_runtime.py` operations. Follow mode remains terminal-streamed; panel/captured modes remain bounded/captured.
 
 ## Proposed Components
 - Installer script: `wpfy` shell script at repo root, delivered as release asset.

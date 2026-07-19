@@ -6,7 +6,7 @@
 - `wpfy site update <domain>`
 - `wpfy site delete <domain>`
 - `wpfy rm <domain> [--force]` (flat command; currently delegates to `wpfy site delete`)
-- `wpfy site list [--enabled] [--disabled]`
+- `wpfy site list`
 - `wpfy site info <domain>`
 - `wpfy site show <domain>`
 - `wpfy site status <domain>`
@@ -73,5 +73,7 @@ Flat commands are the canonical VM/operator target surface where exact equivalen
 ## Command Rules
 - Commands must be idempotent.
 - Commands must not share per-site PHP, DB, Redis, or writable app volumes.
+- `wpfy stack purge` requires `--force`; failed stop or Compose teardown returns non-zero and does not print successful removal.
+- `wpfy clean` defaults to nginx when no cache flag is supplied; any requested cache execution failure returns non-zero while successful/skipped site messages remain visible.
 - SSL commands must run DNS/IP preflight before ACME issuance.
 - Documentation must label unimplemented commands as planned.

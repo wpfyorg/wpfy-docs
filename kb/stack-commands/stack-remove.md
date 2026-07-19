@@ -28,4 +28,4 @@ With Traefik stopped, sites become unreachable at their domains. Run `wpfy stack
 ## Related Commands
 
 - [wpfy stack install](/stack-commands/stack-install)
-- [wpfy stack purge](/stack-commands/stack-purge) — remove completely including volumes
+- [Grouped stack commands](/commands/grouped-stack) — retained stack namespace

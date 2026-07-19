@@ -52,8 +52,11 @@ wpfy site create store.example.com --wp --wpredis --user=admin --email=admin@exa
 - Registry entry in `/var/lib/wpfy/sites.json`
 
 **For WordPress (`--wp`):**
+- Resolves the latest stable en_US release and verifies the versioned official tarball against WordPress.org's published SHA-1 before extraction
 - Runs `wp core download` and `wp core install` after runtime is ready
 - Prints generated admin password once on first install
+- Stops before ownership, runtime, credentials, and provisioning if filesystem bootstrap fails; retry reuses the scaffold and secrets
+- Rejects destination file/directory symlinks, including nested components, and merges core with descriptor-relative no-follow writes; partial retries require the site runtime to be stopped
 
 **With SSL (`-le`):**
 - Runs DNS A/AAAA vs public IP preflight before any file changes
@@ -69,6 +72,13 @@ wpfy site create store.example.com --wp --wpredis --user=admin --email=admin@exa
 | Missing ACME email (with `-le`) | Blocked, no file changes |
 | Compose project name collision | Rejected before file changes |
 | WordPress provision fails | Non-zero exit, redacts password |
+| WordPress download/archive/filesystem bootstrap fails | Non-zero exit; runtime and provisioning are skipped |
+| WordPress release metadata or digest is missing, malformed, or mismatched | Non-zero exit before archive extraction; retry reuses the scaffold |
+| WordPress destination or pre-runtime ownership tree contains a symlink | Non-zero exit; external target is unchanged and runtime/provisioning stay skipped |
+
+`WPFY_SKIP_WORDPRESS_DOWNLOAD=1` is an explicit offline test fixture. Unexpected failures never create exit-0 placeholder success.
+
+The SHA-1 comparison is an integrity check, not a release signature or independent authenticity proof.
 
 ## Related Commands
 

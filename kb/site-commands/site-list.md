@@ -6,28 +6,19 @@ List all managed sites from the JSON registry.
 
 ```bash
 wpfy site list
-wpfy site list --enabled
-wpfy site list --disabled
 ```
-
-## Flags
-
-| Flag | Type | Description |
-|------|------|-------------|
-| `--enabled` | bool | Show only SSL-enabled sites |
-| `--disabled` | bool | Show only non-SSL sites |
 
 ## Examples
 
 ```bash
 wpfy site list
-wpfy site list --enabled
 ```
 
 ## Expected Behavior
 
-- Reads `/var/lib/wpfy/sites.json`
-- Outputs a table: domain, flavor, PHP version, SSL status, creation date
+- Reconciles `/var/lib/wpfy/sites.json` from authoritative site scaffolds before rendering
+- Repairs registry drift atomically and leaves an already-current registry untouched
+- Outputs domain, flavor, SSL status, and cache type
 
 ## Related Commands
 

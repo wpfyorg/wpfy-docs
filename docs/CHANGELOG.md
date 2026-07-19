@@ -2,6 +2,74 @@
 
 ## Unreleased
 
+### RC2 Release Closure (2026-07-19)
+- Prepared `v1.0.0-rc2` with matching package/CLI identity `1.0.0rc2`.
+- Local gates passed: 552 pytest cases, installer/export contracts, package
+  membership inspection, and security audit. Disposable-VPS and provider proof
+  remain deferred and block final `v1.0.0`.
+
+### Phase F Bounded Runtime Performance (2026-07-19)
+- Cached parsed Cloudflare networks by effective default or environment-override CIDR set; invalid ranges remain ignored and override changes remain visible in-process.
+- Stopped ordered public-IP fallback probing after the first valid IPv4 while preserving malformed/error fallback, prior IPv6 observations, and deterministic test overrides.
+- Batched discovered container IDs into one `docker inspect` for site health and one inspect per service-wait poll; empty and failed batches retain `unknown` health semantics.
+- Skipped registry mutation when scaffold metadata is exactly unchanged, preserving registry bytes, mtime, `created_at`, and maintenance state.
+- Verified 552 pytest cases, 175 focused cases, 59 pinned flake8 findings, hardening checks, package builds, docs QA/build, import smoke, and offline CLI QA. Disposable-VPS timing remains deferred.
+
+### Phase E Consolidated Configuration And Operational Primitives (2026-07-18)
+- Routed stored SMTP, Cloudflare DNS, and S3 config through descriptor-relative no-follow env reads with domain-shaped failures.
+- Centralized exact-value redaction for SMTP, DNS, S3, and WordPress errors, including empty, duplicate, repeated, and overlapping values.
+- Centralized mechanical systemd root, quoting, execution, install, disable, and owned-file cleanup behavior while retaining cron/backup policy and unit contents.
+- Reused one CLI-local required-secret input path, canonical project naming, and named healthcheck defaults without changing public syntax or values.
+- Verified 542 pytest cases outside sandbox, focused safety/failure suites, hardening scripts, package builds, and 59 pinned flake8 findings. Live disposable-VPS systemd QA remains deferred.
+
+### Phase D Thin CLI And Deep Operations (2026-07-18)
+- Added `stack.py` as shared-stack operation owner and `cache_operations.py` as cache selection/execution owner; CLI handlers now render structured results instead of constructing Docker commands.
+- Added public site-runtime operations for captured/followed logs, ordered log reset, captured/interactive WP-CLI, HTTP probing, and service readiness; CLI and panel now share those runtime paths.
+- Made `stack purge` require `--force`, block teardown after stop failure/skip, and propagate Compose teardown failure without false success output.
+- Made requested cache-operation failures return non-zero while retaining successful and skipped per-site messages.
+- Added focused stack, cache, runtime, CLI/panel delegation, and static-boundary tests without new runtime dependencies.
+
+### Phase C Bounded Transfers And WordPress Integrity (2026-07-17)
+- Repaired file-backed SigV4 requests so `Content-Length` appears in both the canonical header block and declared `SignedHeaders`, with independent reconstruction coverage for empty/non-empty files and both site/edge consumers.
+- Repaired WordPress bootstrap so pre-existing destination file/directory symlinks, including nested components, fail closed without changing external targets; partial retries also fail while the site runtime is active.
+- Added real-validator CLI remote-restore coverage for valid, malformed, truncated, interrupted, and unexpected-failure paths; truncated gzip `EOFError` now returns a clean validation failure before runtime stop.
+- Excluded `db-data/` payloads from restore validation and descriptor-safe replacement so live MariaDB volume contents remain untouched; post-stop replacement errors now return a controlled failure without restarting a partial site.
+- Moved scaffold healthcheck writes behind the same no-follow boundary as WordPress bootstrap and reject non-directory archive roots before runtime stop.
+- Rejected symlinks across scaffold-managed paths before secret reads or file writes, propagated scaffold ownership failures to update/SSL runtime gates, blocked active WordPress retries before healthcheck mutation, and rejected special archive members.
+- Moved shared managed-site `.env` reads plus compose, environment, and Nginx scaffold writes to descriptor-relative no-follow operations, including deterministic post-validation symlink coverage.
+- Made site and edge S3-compatible archive uploads file-backed, fixed-length, and fully payload-signed while retaining the byte path for storage tests.
+- Streamed remote restore objects into private temporary files with bounded reads, advertised-length checking, cleanup on every exit path, and validation before live mutation.
+- Resolved the latest stable en_US WordPress release, verified its versioned tarball against the published SHA-1 before extraction, and failed closed on missing, malformed, or mismatched metadata.
+- Kept multipart/resumable upload and WP-CLI artifact verification as explicit residual work; SHA-1 is documented as integrity checking, not signature verification.
+
+### Phase B CLI Correctness And State Reconciliation (2026-07-17)
+- Moved Nginx/PHP/MySQL service facts and probes behind the operational-inspection boundary; Nginx now renders the complete authoritative web service and mounted config.
+- Made service flags mutually exclusive, with stopped/unavailable/not-applicable states informational and attempted query failures non-zero.
+- Rebuilt registry reconciliation from canonical `SiteDefinition` state, scoped scans to the supplied root, preserved creation/maintenance metadata, and avoided no-op writes.
+- Made `site list` repair drift before rendering and removed the previously ignored `--enabled`/`--disabled` flags.
+- Made update mismatches neutral, update actions mutually exclusive, runtime/certificate annotations truthful, and unknown site handlers fail immediately.
+
+### Phase A Safety Blockers (2026-07-17)
+- Made local backup publication transactional: failed/empty dumps and corrupt archives are non-zero, SQL staging is always removed, and strict database completeness is available to destructive callers.
+- Made site deletion require strict backup success and a confirmed non-skipped runtime stop; `--force` now bypasses confirmation only.
+- Gated maintenance registry updates, ACME renewal mutation/reload, and WordPress create lifecycle steps on confirmed prerequisites.
+- Added focused failure-injection coverage for backup/delete, maintenance, ACME renewal, and bootstrap lifecycle behavior.
+
+### Runtime Performance And Module Ownership (2026-07-11)
+- Reduced `site_health()` to one container-ID lookup per required service and skipped DB/Redis probes for flavors that do not use them.
+- Cached Docker Compose availability for each short-lived CLI process and batched the five `wpfy secure` container inspections into one Docker call.
+- Streamed WordPress downloads and MariaDB dump/restore data through files, avoiding archive/database-sized Python buffers; failed dumps remain unpublished and unarchived.
+- Split stable path/env helpers and runtime/health adapters into `site_paths.py` and `site_runtime.py`, leaving scaffold generation and persisted layout in `site_layout.py`.
+
+### Public Docs Site Production Pass (2026-07-09)
+- Restyled the VitePress knowledge base from the old MotherDuck treatment to the active Cohere-inspired design system.
+- Reworked the public docs information architecture around flat commands first, with grouped site/stack commands documented as retained surfaces.
+- Added public command articles for flat site, backup, restore, runtime, cron, SMTP, DNS, healthcheck, MOTD, utility, log, SFTP, and retained grouped commands.
+- Added public runbooks for fresh install, WordPress site creation, SSL, wildcard SSL, restore, backups, disposable-VPS validation, and debugging.
+- Added release/reference pages for site isolation, ADR index, release matrix, and `v1.0.0-rc1`.
+- Added `npm run docs:qa` for internal link scanning and forbidden private-string scanning.
+- Added the design/SEO audit follow-up: product context, sitemap/robots metadata, visible interaction states, reduced-motion handling, and a completed home feature grid.
+
 ### CLI VM Release Page 9 Grouped Retention (2026-07-09)
 - Retained grouped `wpfy site ...` and `wpfy stack ...` commands for this release instead of removing parser surfaces.
 - Classified `wpfy stack install|remove|purge|migrate|upgrade|status` as the canonical grouped stack namespace.

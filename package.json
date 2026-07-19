@@ -5,7 +5,8 @@
   "scripts": {
     "docs:dev": "vitepress dev kb",
     "docs:build": "vitepress build kb",
-    "docs:preview": "vitepress preview kb"
+    "docs:preview": "vitepress preview kb",
+    "docs:qa": "node scripts/qa-kb.mjs"
   },
   "devDependencies": {
     "vitepress": "^1.6.4",

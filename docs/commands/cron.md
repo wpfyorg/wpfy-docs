@@ -41,6 +41,7 @@ wpfy log cron [--lines N]
 ## Idempotency Behaviour
 - Implemented: `wpfy cron install` overwrites the managed service/timer files.
 - Implemented: `wpfy cron disable` removes managed cron timer and service files.
+- Disable removes managed files only after `systemctl disable --now` succeeds, then reloads systemd; failed disable leaves files intact.
 - Implemented: interval runners skip Docker/WP-CLI execution when runtime is skipped or Docker is unavailable.
 
 ## Failure Modes

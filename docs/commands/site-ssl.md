@@ -14,6 +14,7 @@ Enable or manage SSL for a site.
 - Implemented: SSL enablement uses the managed-site lifecycle module so preflight always completes before scaffold/runtime mutation and existing flavor/PHP settings are preserved.
 - Implemented: for WordPress flavors, enabling SSL updates WordPress `home` and `siteurl` to `https://<domain>` and returns a non-zero result if either WP-CLI update fails.
 - Implemented: preflight, ACME state reads, case-insensitive domain matching, metadata, expiry, and renewal share the `certificate_lifecycle.py` interface.
+- Implemented: renewal confirms ACME backup creation and copy before rewrite, confirms rewrite before reload, and reports rewrite/reload partial failures truthfully while preserving the backup.
 - Implemented: enabling SSL (via `site create -le`, `site update -le`, or `site ssl --letsencrypt`) requires a valid ACME contact email before preflight runs. The effective email is the one already written to the Traefik scaffold (`traefik.yml`), else `WPFY_ACME_EMAIL`; the historical `admin@localhost` default is rejected because Let's Encrypt refuses it at registration. Fix by setting `WPFY_ACME_EMAIL=you@example.com` and re-running `wpfy stack install --nginx`.
 
 ## Proxied domains (Cloudflare)
@@ -62,6 +63,7 @@ wpfy site ssl example.com --letsencrypt wildcard --dns cloudflare
 - DNS A/AAAA records do not point to this VPS.
 - Public IP detection fails.
 - Traefik ACME storage is unavailable.
+- ACME backup, rewrite, or Traefik reload fails; later mutation steps are blocked and partial state is reported.
 - ACME client failure after preflight passes.
 
 ## Security Notes

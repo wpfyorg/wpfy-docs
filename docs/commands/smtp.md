@@ -47,6 +47,7 @@ wpfy smtp test --to owner@example.com
 - `smtp set` in non-interactive mode requires `--password-stdin`.
 - `smtp test` requires either `--dry-run` or explicit `--to`.
 - Network or authentication failures return a nonzero exit and redact configured credentials.
+- Symlink-backed or unreadable stored config returns a controlled configuration error; wpfy does not follow the config file into another host path.
 
 ## Security Notes
 - Do not pass SMTP passwords on the command line.
