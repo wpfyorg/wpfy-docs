@@ -125,3 +125,10 @@
 - Alternatives considered: A `write:packages` PAT in `PUBLICPUSH` (tried; reverted — expires, failed login).
 - Consequence: No Actions secret/PAT is required; the package must keep the `wpfy` repo's Write access. Amends the 2026-06-08 PAT decision.
 - Status: Accepted.
+
+## 2026-07-23: In-process panel jobs and append-only redacted events
+- Decision: Run panel mutations as in-process jobs with progress and read-once credential payloads, and record operations in a size-rotated append-only redacted JSONL event log. Route metadata flows through `authorize(principal, meta, domain)`; today every authenticated request uses one implicit admin principal.
+- Reason: The panel needs non-blocking site lifecycle operations, live progress, one-time credential delivery, and inspectable operation history without adding a database, external queue, or persistent secret store. A centralized authorization seam preserves a path to future authentication and roles.
+- Alternatives considered: Synchronous HTTP mutations; persistent database or external job queue; persisted credential payloads; SQLite events; mandatory event writes; and handler-local authorization checks.
+- Consequence: Jobs and payloads do not survive a panel restart, and credentials cannot be recovered after the one read. Event writes are best-effort and may be absent if logging fails, but cannot break the operation; key-based redaction keeps known secret fields out of the log. The panel remains loopback-only, bearer-token protected, single-token, and single-operator.
+- Status: Accepted.
