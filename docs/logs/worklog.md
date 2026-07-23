@@ -1,5 +1,10 @@
 # Worklog
 
+## 2026-07-24 - Phase 2a per-site databases and config overrides
+- Added isolated database/user operations with exact identifier validation and in-container MariaDB secret expansion.
+- Added durable PHP settings, operator-owned PHP/Nginx override files, fail-closed Nginx validation, loopback-only Adminer, CLI commands, and panel routes.
+- Added Phase 2a operation/API regression tests and ADR 0013; final verification is recorded in the application repository report.
+
 ## 2026-07-19 - RC2 release closure
 - Created separate A–F implementation, payload/export, and private-evidence commits.
 - Verified clean-commit tests, installer/export contracts, test-free wheel/sdist,

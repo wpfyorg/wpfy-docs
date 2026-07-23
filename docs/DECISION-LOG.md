@@ -126,6 +126,13 @@
 - Consequence: No Actions secret/PAT is required; the package must keep the `wpfy` repo's Write access. Amends the 2026-06-08 PAT decision.
 - Status: Accepted.
 
+## 2026-07-24: Per-site config overrides and validated Nginx includes
+- Decision: Keep generated Nginx server blocks and wpfy PHP settings authoritative, expose operator-owned `nginx/extra/custom.conf` and `php/custom.ini`, validate Nginx snippets inside each site's web container before atomic installation, and expose Adminer only on a loopback port on the site's private network.
+- Reason: This closes the database/PHP/vhost parity gap without permitting raw vhost replacement, cross-site mounts, public Adminer exposure, SQL identifier injection, or PHP ini directive injection.
+- Alternatives considered: raw vhost editor, host-side or skipped-runtime Nginx validation, shared PHP override directories, and public/Traefik Adminer publication.
+- Consequence: Nginx custom updates fail closed when Docker is unavailable; generated files are deterministic while operator-owned files survive refresh; database root credentials stay inside the database container and generated panel passwords use read-once job payloads. See ADR 0013.
+- Status: Accepted.
+
 ## 2026-07-23: In-process panel jobs and append-only redacted events
 - Decision: Run panel mutations as in-process jobs with progress and read-once credential payloads, and record operations in a size-rotated append-only redacted JSONL event log. Route metadata flows through `authorize(principal, meta, domain)`; today every authenticated request uses one implicit admin principal.
 - Reason: The panel needs non-blocking site lifecycle operations, live progress, one-time credential delivery, and inspectable operation history without adding a database, external queue, or persistent secret store. A centralized authorization seam preserves a path to future authentication and roles.
