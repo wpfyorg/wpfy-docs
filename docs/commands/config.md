@@ -23,6 +23,9 @@ wpfy refresh example.com
 wpfy refresh all --restart
 ```
 
+## Panel Surface
+The site detail panel adds a PHP Settings tab with current values, server-authoritative validation, and a dry-run preview before applying changes. The Vhost tab keeps the operator include editable only through validated `nginx -t` saves and displays validation output on both success and failure. The generated `nginx/default.conf` remains wpfy-owned and read-only; its content is not currently exposed by the panel API.
+
 ## Safety Notes
 - `config` output is sanitized and must not print database passwords, salts, tokens, SMTP passwords, or raw `.env` content.
 - Password changes use prompt or stdin; raw password values are not accepted as CLI arguments.

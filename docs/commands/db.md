@@ -56,8 +56,11 @@ Database and user names must match exactly `^[a-z][a-z0-9_]{0,31}$`. The value i
 ## Adminer Isolation
 Adminer is attached only to the site's `site` network and publishes `127.0.0.1:<port>:8080`. It is not routed through Traefik and never binds `0.0.0.0`. Use an SSH tunnel when the operator needs access from another machine.
 
+## Panel Surface
+The browser panel's Databases tab lists databases and scoped users, accepts database/user creation, and requires typing the exact resource name before a drop action enables. User creation and password rotation run as panel jobs; generated passwords appear in the one-time credential panel and are not fetched again. Adminer can be toggled from the same tab; when enabled, the panel shows `http://127.0.0.1:<port>` as plain text and directs remote operators to use an SSH tunnel.
+
 ## Failure Modes
 - Invalid domain, missing site, or a site without a database service.
 - Invalid database/user identifier or invalid Adminer port.
-- Docker/Compose unavailable: database commands fail explicitly; Adminer state can be persisted offline but cannot claim a runtime start.
+- Docker/Compose unavailable: database commands fail explicitly; Adminer state can be persisted offline but cannot claim a runtime start. Panel responses use HTTP 503 for this actionable runtime refusal.
 - MariaDB command failure: stderr/stdout is returned without exposing the root password.

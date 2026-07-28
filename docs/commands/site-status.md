@@ -8,6 +8,7 @@ Inspect the current state of a managed site and, when possible, its Docker Compo
 - Implemented: reports Compose runtime state when Docker is available.
 - Implemented: inspects container health with `docker inspect` when containers are running.
 - Implemented: performs an HTTP probe against the per-site web container when Docker is available.
+- Implemented: runs `nginx -t` inside a running web container and includes rejected generated configuration in the health summary.
 - Implemented: reports readiness fields for scaffold, bootstrap, and runtime.
 - Implemented: service-level checks for app, web, DB, and Redis based on the site flavor.
 - Implemented: prints a sectioned status summary with human-friendly yes/no readiness fields and a short health summary line.
@@ -32,15 +33,15 @@ wpfy site status example.com
 - `bootstrap_ready`
 - `runtime_ready`
 - `http_ready`
-- short message describing runtime or bootstrap state
+- short message describing runtime, bootstrap, or Nginx configuration state
 
 ## Readiness States
 - `missing`: no managed site exists.
 - `needs-bootstrap`: scaffold exists but WordPress-style app files are not bootstrapped.
 - `degraded`: bootstrap is ready but Docker/Compose cannot be inspected.
 - `ready`: scaffold, bootstrap, and runtime are all healthy enough to report as ready.
-- `partial`: app container is up, but one or more required runtime services are missing or unhealthy.
-- `running`: runtime is up and the HTTP probe has passed.
+- `partial`: app container is up, but one or more required runtime services are missing or unhealthy, including a rejected Nginx configuration.
+- `running`: runtime is up, `nginx -t` passes, and the HTTP probe has passed.
 
 ## Idempotency Behaviour
 - Read-only and safe to run repeatedly.
