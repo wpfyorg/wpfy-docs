@@ -47,30 +47,36 @@ access.
    Exposure is refused until a factor exists. This is not advisory — the command
    stops.
 2. Point a DNS A/AAAA record for the panel domain at the VPS.
-3. Expose it. The domain must be typed twice — `--confirm` has to match
-   `--domain` exactly:
+3. Configure the exposure router. The domain must be typed twice — `--confirm`
+   has to match `--domain` exactly:
    ```
    wpfy panel expose --domain panel.example.com --confirm panel.example.com
    ```
    This runs the same DNS/IP preflight as site SSL and never skips it. It writes
    a Traefik file-provider router with TLS and a rate-limit middleware, on a
-   dedicated `wpfy-panel-edge` network.
-4. Optionally run the panel as a service so it survives a reboot:
+   dedicated `wpfy-panel-edge` network. The command reports router configuration,
+   not public readiness.
+4. **Install the panel service. This step is mandatory; the router returns 502
+   without its backend:**
    ```
    wpfy panel service install
    ```
-5. Reverse it at any time:
+5. Check that both pieces are configured:
+   ```
+   wpfy panel expose --status
+   ```
+   The router must be `configured` and the service must be `installed` before
+   the public URL is expected to work.
+6. Reverse it at any time:
    ```
    wpfy panel expose --disable
    ```
    Idempotent — safe to run when nothing is exposed.
 
-> There is currently **no command that reports exposure state**. `expose
-> --disable` is the reliable way to reach a known state: it is idempotent, so
-> running it when nothing is exposed is harmless. To inspect without changing
-> anything, look for the generated router file under the Traefik dynamic
-> configuration directory — its presence is what wpfy itself treats as
-> "exposed".
+> `wpfy panel expose --status` reports the generated router, recognised domain,
+> and whether the required panel service is installed. It is local configuration
+> state, not a public network probe; verify the HTTPS URL after both pieces are
+> configured. `expose --disable` remains the idempotent way to remove exposure.
 
 ## Firewalls
 
