@@ -1,0 +1,53 @@
+# ADR 0016: Per-site security controls and generated Nginx rules
+
+- Status: Accepted
+- Date: 2026-07-24
+
+## Context
+
+Per-site deny lists and user-agent blocks are evaluated by the site's Nginx container, but requests arrive from the shared Traefik edge proxy. Without real-client-IP resolution, every access rule sees the proxy address instead of the visitor. Conversely, trusting every possible source for forwarded headers makes the header attacker-controlled and turns a deny list into a bypass.
+
+The rules are rendered into an Nginx include that wpfy owns. The include directory is mounted read-only into the web container, and scaffold generation can happen before a runtime exists. Operator-supplied `custom.conf` therefore has a different trust boundary from deterministic rules rendered from validated wpfy state.
+
+## Decision
+
+Persist per-site security state in `<site>/security.json`. The JSON is authoritative and contains normalized `deny_ips` and `ua_blocks` lists. The derived `<site>/nginx/extra/wpfy-security.conf` is regenerated from that state on scaffold creation, refresh, and security mutations. Writes are atomic and no-follow; invalid input is rejected before state or generated configuration is changed.
+
+Generated security rules are trusted wpfy output. They are written directly and deterministically, without a container `nginx -t` round-trip. This matches the Phase 3 generated-cache decision: a candidate filename cannot be mounted into the read-only include directory, and validation can fail before an `app` upstream or runtime exists. `custom.conf` remains operator-owned and keeps fail-closed validate-then-swap behavior.
+
+The real-IP preamble trusts the CIDR discovered from the Docker `wpfy` edge network rather than a container hostname:
+
+```nginx
+set_real_ip_from 172.18.0.0/16; # example only; discovered per host
+real_ip_header X-Forwarded-For;
+real_ip_recursive on;
+```
+
+The actual subnet is read from `docker network inspect wpfy` and rendered; wpfy never hardcodes or guesses the example range. This avoids config-load DNS resolution and stale hostname-to-address resolution when Traefik is recreated. The trade-off is that every container on the wpfy-controlled edge network is trusted, not only Traefik; that network is owned by wpfy and is narrower and more controllable than a wildcard. When a site is Cloudflare-proxied, the published Cloudflare CIDRs are trusted as an additional hop so recursive resolution reaches the visitor rather than stopping at a Cloudflare edge address. If discovery fails, wpfy installs a loopback-only trust source plus `deny all` and returns a non-zero result. Wildcard sources such as `0.0.0.0/0` and `::/0` are refused because they allow a visitor to forge the forwarded address used by the deny list.
+
+CIDRs are parsed with `ipaddress.ip_network(..., strict=False)`, canonicalized, and rejected when they are empty, invalid, or a `/0` network. User-agent patterns use a conservative ASCII allowlist for quoted Nginx regexes. The allowlist excludes quotes, backslashes, semicolons, braces, NULs, and line breaks, so accepted input cannot terminate the quoted regex or inject a second directive.
+
+Basic authentication state is authoritative in `security.json`, while the credential hash is kept at `<site>/nginx/htpasswd`, outside the served `app/` document root. The file is mounted read-only at `/etc/nginx/wpfy-htpasswd` and uses mode `0640` with the site's Unix uid. Because it is an individual Compose bind mount, password rotation and revocation update the existing inode in place with `O_NOFOLLOW`; atomic replacement would leave a running Nginx container reading the old credential inode. The generated health endpoint explicitly disables inherited basic auth so Docker's internal healthcheck continues to work. Passwords are generated or accepted through stdin/prompt, returned once when generated, and never persisted in state or events.
+
+Cloudflare-only is enforced as a Traefik `ipAllowList` middleware on the site's router, using the effective published Cloudflare ranges. It is intentionally an edge control rather than an Nginx deny rule: rejecting at the origin would still allow non-Cloudflare traffic to reach the origin network. Disabling the feature removes both the middleware label and router reference. Before enabling it, the security preflight resolves the site's A/AAAA records and warns when they are not all Cloudflare addresses; the CLI requires `--force` to proceed. The operation layer returns the warnings for panel confirmation. No additional warning is emitted for unknown webhooks or WP-Cron dependencies because wpfy has no reliable inventory of those external callers; its managed health probe is exempted directly.
+
+## Alternatives considered
+
+- Trust `0.0.0.0/0` or `::/0`: rejected because forwarded headers become spoofable.
+- Trust the Traefik hostname: rejected because Nginx resolves it at config-load time, making startup depend on edge DNS and leaving stale addresses after container recreation.
+- Trust a fixed guessed subnet: rejected because it may not match the network created on the host and would make the rule incorrect.
+- Trust all sources: rejected because forwarded headers become spoofable.
+- Enforce Cloudflare-only only in site Nginx: rejected because traffic has already reached the origin before Nginx can reject it.
+- Put `htpasswd` under `app/`: rejected because the served document root and its backups would expose a crackable credential hash.
+- Use an atomic replacement for the individually mounted `htpasswd`: rejected because the running container remains pinned to the original inode and would continue accepting a revoked password.
+- Validate generated security snippets through a temporary container mount: rejected because the include directory is read-only and scaffold creation may precede runtime availability.
+- Store deny and user-agent rules only in the generated file: rejected because refresh would have no authoritative source and disabling a rule could leave stale directives behind.
+
+## Consequences
+
+- Deny rules evaluate the real client address supplied through the Traefik edge rather than the proxy's connection address.
+- Security state survives scaffold regeneration and backup/restore; generated bytes remain stable across repeated renders.
+- Conservative user-agent validation may reject exotic regex syntax, but it prevents configuration injection at the Nginx trust boundary.
+- The discovered edge subnet removes hostname-resolution failure modes but trusts the full wpfy-controlled network; Cloudflare ranges add the second trusted hop only when the site is proxied or Cloudflare-only.
+- Basic authentication protects normal site requests without breaking the managed health probe; external webhook and WP-Cron compatibility remains operator-specific and is not inferred by wpfy.
+- Cloudflare-only blocks at Traefik before the request reaches the site container, but enabling it on direct DNS is an intentional lockout if the operator uses `--force` after the warning.
