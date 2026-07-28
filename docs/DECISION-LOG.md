@@ -195,3 +195,10 @@
 - Alternatives considered: reading Docker's JSON log driver; a shared log and jail; the stock `INPUT` action; the default `create` rotation mode; keeping an `xmlrpc.php` rule keyed on 401/403, or widening it to any status.
 - Consequence: Existing sites need one `wpfy refresh <domain>` to pick up the bind mount. wpfy installs no firewall rules of its own; fail2ban owns only the jail action it is explicitly enabled to run. fail2ban's failure mode is silence — a filter matching nothing is indistinguishable from a quiet week — so a gate compiles the shipped regex against real log lines and fails if it matches none of the abusive ones or any of the ordinary ones.
 - Status: Accepted.
+
+## 2026-07-28: Separate SSL intent from observed certificate state
+- Decision: Keep `SiteDefinition` authoritative for requested TLS routing, but derive the displayed certificate state from Traefik's local ACME data. Report `disabled`, `requested`, or `enabled`; reserve `enabled` for a matching issued certificate. See ADR 0024.
+- Reason: Rendering a TLS router does not prove ACME issuance succeeded, while persisting an asynchronous issuance flag would become stale and public network probes would make routine list/status commands slow and fallible.
+- Alternatives considered: persisted requested/issued/failed state, public HTTPS probes on every status command, or continuing to display intent as enabled.
+- Consequence: `site list`, `site info`, and `site status` remain local and fast but no longer report an unissued certificate as green. External DNS/CDN delivery still requires live validation.
+- Status: Accepted.
