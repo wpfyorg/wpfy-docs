@@ -1,5 +1,59 @@
 # Worklog
 
+## 2026-07-27 - Phase 5b dashboard, Events, and Services panel
+- Added authenticated metrics and structured services endpoints plus site-scoped and separately confirmed edge restart routes.
+- Reused `site_cron._allowed_services(domain)` through its validator before any service name reaches `docker compose --project-name <site> restart <service>`.
+- Added responsive host/per-site canvas graphs, explicit no-sample guidance, Events domain/action filters with visible job IDs, and a Services page whose edge warning says every site is affected.
+- Added focused loopback endpoint tests including real argument-vector assertions; all 312 immutable gates and all 1098 tests passed.
+
+## 2026-07-27 - Phase 5a metrics sampler
+- Added a mode-0600 SQLite database with WAL, exact-scope range and timestamp retention indexes, host `/proc` sampling, and one bounded whole-machine Docker stats call.
+- Resolved container names against whole candidates built from (project x known service), accepting `{project}-{service}` with an optional replica index, so strict-prefix projects, the shared Traefik container, and unrelated Compose stacks cannot be misattributed. Requiring the replica index would have discarded every wpfy container, since each generated service sets an explicit `container_name`; the gate fixture was corrected to production naming so that parser can no longer pass.
+- Joined sampling to the minute tick and pruning to the daily tick with explicit failure lines while preserving other cron tenants; corrected daily `HealthResult` handling through shared readiness semantics.
+- Added `wpfy metrics sample|show|prune`, focused parser/storage/concurrency tests, ADR 0018, and the metrics command specification. Real-Docker and full-suite evidence is recorded in the Phase 5a report.
+
+## 2026-07-27 - Phase 4b security and cron panel
+- Added bearer-protected security and cron routes with mutating metadata derived by the existing authorization gates.
+- Security dry-run builds and validates desired state plus preflight warnings without calling operation-layer mutators; unacknowledged Cloudflare lockout warnings return before mutation.
+- Added responsive Security and Cron tabs, one-time basic-auth credential rendering, site-derived service choices, real run outcomes, and a coral high-contrast WARN badge distinct from neutral PLAN.
+- Added focused live-loopback endpoint tests for dry-run immutability, acknowledgement, credentials, leak scans, cron CRUD, service isolation, and skipped execution outcomes.
+
+## 2026-07-27 - Phase 4a.5 per-site cron runner correction
+- Moved the authoritative timeout into the selected site container as `timeout -k 5` around a fixed supervisor; the host subprocess timeout adds 15 seconds for exec startup, five for in-container kill grace, and five as a Compose-client wedge backstop.
+- Confirmed all PHP versions, Nginx, MariaDB, Redis, SFTP, and Adminer images provide both `timeout` and `setsid`. Because raw BusyBox timeout leaves background descendants alive, the supervisor uses a new process group, TERM then KILL, and a random marker that distinguishes expiry from a command's natural exit 124.
+- Removed profile-only `wpcli` from selectable cron services, migrating prior `wpcli` entries to `app`; a live `app` container confirmed `wp` at `/usr/local/bin/wp` and working directory `/var/www/html`.
+- Replaced job-output string matching with a failed-exec Compose running-service probe. Two live 2-second timeout ticks using `sleep 61 & wait` left no command, timeout, supervisor, or descendant process after either run.
+- Verified 44 cron gates (with 33 expected security-branch failures), 707 non-gate tests, and the immutable gate checksum.
+
+## 2026-07-27 - Phase 4a.2 per-site security lockout controls
+- Completed basic auth, Cloudflare-only edge enforcement, DNS lockout preflight, and dynamic real-IP trust on top of the Phase 4a.1 security state/rendering contract.
+- Kept `nginx/htpasswd` outside `app/`, mode `0640`, and updated it in place with no-follow flags because Compose mounts the individual file; live Docker rotation preserved host inode `62464967` and container inode `300`, with 43 bytes on both before and after.
+- Real Docker evidence: `nginx -t` succeeded; old basic-auth credentials returned HTTP 401 while the rotated credential returned HTTP 200; the managed healthcheck became healthy after explicitly disabling inherited auth for `/healthz.html`.
+- Cloudflare-only labels use the effective published ranges and `docker compose config --quiet` returned 0. The first 33 Phase 4 security gates passed; the full suite had 818 passes and 44 expected cron failures because `site_cron` is absent on this branch; non-gate tests had 661 passes.
+- Extended ADR 0016 and the decision log with edge-vs-origin enforcement, CIDR trust trade-off, credential mount/revocation behavior, and preflight scope.
+
+## 2026-07-24 - Phase 3a.3 single-file bind mount fix
+- Changed generated `nginx/cache-path.conf` installation from atomic replacement to an inode-preserving no-follow write because Compose mounts the file individually and a running container remains pinned to the original inode.
+- Kept `nginx/extra/wpfy-cache.conf` on candidate-plus-atomic-swap semantics inside its directory bind mount, with non-`.conf` candidate names and cleanup on every exit path.
+- Made cache reload rejection non-zero and actionable, retrying briefly for delayed shared-folder propagation, and added running `nginx -t` checks to site health and diagnostics so an HTTP-healthy site cannot report ready when Nginx rejected generated configuration.
+- Added offline inode-identity and reload-reporting regression coverage; application and real-Docker verification are recorded in the Phase 3a.3 report.
+
+## 2026-07-24 - Phase 3a.1 FastCGI cache startup fix
+- Fixed wpfc startup by creating a per-site `cache-data/` directory before Compose rendering, adding it to the managed-path symlink guard and site-uid ownership pass, and bind-mounting it at `/var/cache/nginx/fastcgi`.
+- Kept plugin-based cache modes unchanged: their cache-path snippet remains empty and they do not mount or create `cache-data/`.
+- Verified 113 gates, 720 full pytest tests, immutable gate checksum, double-refresh byte stability, and real-image `nginx -t` as uid 100000.
+
+## 2026-07-24 - Phase 3a native cache integration
+- Split page-cache and Redis object-cache selection into independent persisted axes with legacy `SITE_FLAVOR` migration.
+- Added native free-plugin installation, paid/BYO staging, wpfy FastCGI cache rendering, Redis Object Cache wiring, safe bypass rules, and layered purge operations.
+- Added `wpfy cache <domain> show|set|object|purge` plus orthogonal create/update shortcuts; panel files remain reserved for Phase 3b.
+- Added ADRs 0014 and 0015 and the cache command specification. Verified 718 pytest cases and 113 immutable gates in the application worktree.
+
+## 2026-07-24 - Phase 2b panel parity
+- Added browser tabs for Databases, PHP Settings, and Vhost with typed exact-name confirmations, one-time database credential rendering, Adminer loopback/tunnel guidance, PHP dry-run previews, and verbatim Nginx validation output.
+- Centralized panel operation status mapping so invalid input, missing sites, unavailable runtime, and rejected Nginx content use 400, 404, 503, and 422 respectively.
+- Recorded generated `nginx/default.conf` API exposure as a remaining limitation; UI identifies the wpfy-owned path without widening the Phase 2a API.
+
 ## 2026-07-24 - Phase 2a per-site databases and config overrides
 - Added isolated database/user operations with exact identifier validation and in-container MariaDB secret expansion.
 - Added durable PHP settings, operator-owned PHP/Nginx override files, fail-closed Nginx validation, loopback-only Adminer, CLI commands, and panel routes.
@@ -110,7 +164,7 @@
 - Added `src/wpfy/site_lifecycle.py` as the interface for site create, update, and SSL enablement.
 - Moved preflight ordering, desired site specification, scaffold/runtime sequencing, WordPress provisioning, and registry updates out of `cli.py`.
 - Retargeted CLI tests to the lifecycle interface and added direct lifecycle tests for operation ordering, preflight safety, registry updates, and preservation of existing site settings.
-- Live VPS validation on `155.94.241.76` found that later SSL enablement left WordPress canonical URLs on HTTP; fixed the lifecycle to update `home` and `siteurl` through WP-CLI.
+- Live VPS validation on `203.0.113.76` found that later SSL enablement left WordPress canonical URLs on HTTP; fixed the lifecycle to update `home` and `siteurl` through WP-CLI.
 - Verified the full test suite with 161 passing tests before redeployment.
 
 
@@ -126,7 +180,7 @@
 - Added focused shell coverage for TTY rendering, non-TTY stability, verbose/log behavior, progress continuity, success, failure, and signals.
 
 ## 2026-06-06 - Live WordOps UX verification
-- Installed WordOps 3.22.0 and its recommended stack on the disposable VPS at `155.94.241.76`.
+- Installed WordOps 3.22.0 and its recommended stack on the disposable VPS at `203.0.113.76`.
 - Verified a live WordPress and Let's Encrypt flow on `ux.wpfydev.top`, including HTTP redirect, HTTPS response, and WordPress core installation.
 - Added TTY-only progress messages to `wpfy stack install` before each selected component pull/start operation, based on the observed value of WordOps' long-running step feedback.
 
@@ -140,7 +194,7 @@
 - Added `tests/installer-swap.sh` and wired it into `scripts/security-audit.sh` for deterministic dry-run coverage of swap sizing, disables, overrides, and no file creation.
 - Step 1 of non-root (`ubuntu`) operator support: made `/usr/local/bin/wpfy` self-elevate via `sudo` (forwards `WPFY_*`/`ACME_*`), so non-root logins run plain `wpfy …` (ADR 0008). Root logins unchanged; `WPFY_NO_SELF_ELEVATE=1` escape hatch.
 - Fixed `handle_site_wp` to always inject wp-cli `--allow-root` (wpcli container runs as root; host-uid gate broke non-root operators).
-- Retargeted validation harness to `ubuntu@43.205.111.80` / `m.wpfydev.top`: home-based staging dir, remote runner runs unprivileged with `wpfy` bare and `$SUDO` only on raw non-wpfy probes.
+- Retargeted validation harness to `ubuntu@203.0.113.80` / `m.wpfydev.top`: home-based staging dir, remote runner runs unprivileged with `wpfy` bare and `$SUDO` only on raw non-wpfy probes.
 - Updated docs: ADR 0008, DECISION-LOG, SECURITY (operator privilege model), INSTALLER (root/sudo), CHANGELOG, MEMORY.
 - Step 2 live VPS run as `ubuntu`: full `all` run completed and evidence was pulled to `.context/vps-validation/20260604T233922Z`; wrapper self-elevation worked, but ACME failed because external port 443 timed out while the VPS listened on 443.
 - Tightened the validation harness so missing ACME certs record a validation failure and bounded curl timeouts keep blocked 443 probes short.
