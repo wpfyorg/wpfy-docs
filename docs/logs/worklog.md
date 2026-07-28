@@ -164,7 +164,7 @@
 - Added `src/wpfy/site_lifecycle.py` as the interface for site create, update, and SSL enablement.
 - Moved preflight ordering, desired site specification, scaffold/runtime sequencing, WordPress provisioning, and registry updates out of `cli.py`.
 - Retargeted CLI tests to the lifecycle interface and added direct lifecycle tests for operation ordering, preflight safety, registry updates, and preservation of existing site settings.
-- Live VPS validation on `203.0.113.76` found that later SSL enablement left WordPress canonical URLs on HTTP; fixed the lifecycle to update `home` and `siteurl` through WP-CLI.
+- Live VPS validation on `<redacted-host>` found that later SSL enablement left WordPress canonical URLs on HTTP; fixed the lifecycle to update `home` and `siteurl` through WP-CLI.
 - Verified the full test suite with 161 passing tests before redeployment.
 
 
@@ -180,7 +180,7 @@
 - Added focused shell coverage for TTY rendering, non-TTY stability, verbose/log behavior, progress continuity, success, failure, and signals.
 
 ## 2026-06-06 - Live WordOps UX verification
-- Installed WordOps 3.22.0 and its recommended stack on the disposable VPS at `203.0.113.76`.
+- Installed WordOps 3.22.0 and its recommended stack on the disposable VPS at `<redacted-host>`.
 - Verified a live WordPress and Let's Encrypt flow on `ux.wpfydev.top`, including HTTP redirect, HTTPS response, and WordPress core installation.
 - Added TTY-only progress messages to `wpfy stack install` before each selected component pull/start operation, based on the observed value of WordOps' long-running step feedback.
 
@@ -194,7 +194,7 @@
 - Added `tests/installer-swap.sh` and wired it into `scripts/security-audit.sh` for deterministic dry-run coverage of swap sizing, disables, overrides, and no file creation.
 - Step 1 of non-root (`ubuntu`) operator support: made `/usr/local/bin/wpfy` self-elevate via `sudo` (forwards `WPFY_*`/`ACME_*`), so non-root logins run plain `wpfy …` (ADR 0008). Root logins unchanged; `WPFY_NO_SELF_ELEVATE=1` escape hatch.
 - Fixed `handle_site_wp` to always inject wp-cli `--allow-root` (wpcli container runs as root; host-uid gate broke non-root operators).
-- Retargeted validation harness to `ubuntu@203.0.113.80` / `m.wpfydev.top`: home-based staging dir, remote runner runs unprivileged with `wpfy` bare and `$SUDO` only on raw non-wpfy probes.
+- Retargeted validation harness to `ubuntu@<redacted-host>` / `m.wpfydev.top`: home-based staging dir, remote runner runs unprivileged with `wpfy` bare and `$SUDO` only on raw non-wpfy probes.
 - Updated docs: ADR 0008, DECISION-LOG, SECURITY (operator privilege model), INSTALLER (root/sudo), CHANGELOG, MEMORY.
 - Step 2 live VPS run as `ubuntu`: full `all` run completed and evidence was pulled to `.context/vps-validation/20260604T233922Z`; wrapper self-elevation worked, but ACME failed because external port 443 timed out while the VPS listened on 443.
 - Tightened the validation harness so missing ACME certs record a validation failure and bounded curl timeouts keep blocked 443 probes short.
