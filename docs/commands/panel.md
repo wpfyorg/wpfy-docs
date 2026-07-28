@@ -2,6 +2,34 @@
 
 The loopback-only panel exposes site operations through an authenticated JSON API. Start it on the server and use an SSH tunnel for remote browser access; the panel does not bind to a public interface.
 
+## First-run setup
+
+On an install with no panel users, `wpfy panel` prints a URL containing a run-token fragment. The browser uses that token to call:
+
+```text
+GET  /api/setup/status
+POST /api/setup
+POST /api/setup/totp
+```
+
+The account form requires first/last name, username, email, a password of at least 12 characters plus confirmation, and the licence/no-warranty acknowledgement. Anonymous telemetry is a separate optional checkbox and is selected by default. Email is stored for future recovery only; it is not verified and is not a login identifier.
+
+`POST /api/setup` creates the first administrator and returns a temporary named-user setup session. Both account setup routes then return HTTP 410 permanently, including direct POST attempts. Setup creation returns 403 when the panel is edge-bound and tells the operator to use the SSH tunnel. Invalid submissions count toward the existing client throttle.
+
+The TOTP step discloses one seed and QR code, verifies a real authenticator code before persistence, and then removes the setup privilege. Skip is available only after a second confirmation stating that `wpfy panel expose` will refuse without a factor. The exposure gate is unchanged.
+
+Install state lives in `<config>/panel-state.json` at mode 0600. It records the stable install UUID, telemetry preference/last-send time, and licence acceptance identity/time/version. User records add first name, last name, and email; older records read with empty profile fields.
+
+## Telemetry controls
+
+```text
+wpfy telemetry status
+wpfy telemetry enable
+wpfy telemetry disable
+```
+
+Status prints the real payload that would be sent: `install_id`, `wpfy_version`, `os`, `release`, `python_version`, `site_count`, and `active_sites`. No domain or other site/operator identifier is included. `WPFY_TELEMETRY=0` overrides stored state. The built-in endpoint is intentionally empty, so nothing is sent unless `WPFY_TELEMETRY_ENDPOINT` is configured.
+
 ## Cache endpoints
 
 All cache routes are scoped to a managed WordPress site and require the panel bearer token.

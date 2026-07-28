@@ -1,5 +1,11 @@
 # Worklog
 
+## 2026-07-28 - First-run panel setup and telemetry
+- Added private install state, forward-compatible user profile fields, run-token setup status/create routes, permanent post-setup closure, edge refusal, shared client throttling, and a 12-character password minimum.
+- Added a responsive two-step wizard with separate licence/telemetry choices, verified TOTP enrollment, explicit skip consequences, and pinned MIT QRCode.js provenance under the unchanged CSP.
+- Added exhaustive seven-field opt-out telemetry, daily lock-serialized background delivery, an intentionally empty built-in endpoint, environment override, and exact-payload CLI controls.
+- Added focused setup/auth/telemetry tests and ADRs 0025/0026. Live VPS proof remains to be recorded separately.
+
 ## 2026-07-27 - Phase 5b dashboard, Events, and Services panel
 - Added authenticated metrics and structured services endpoints plus site-scoped and separately confirmed edge restart routes.
 - Reused `site_cron._allowed_services(domain)` through its validator before any service name reaches `docker compose --project-name <site> restart <service>`.

@@ -202,3 +202,17 @@
 - Alternatives considered: persisted requested/issued/failed state, public HTTPS probes on every status command, or continuing to display intent as enabled.
 - Consequence: `site list`, `site info`, and `site status` remain local and fast but no longer report an unissued certificate as green. External DNS/CDN delivery still requires live validation.
 - Status: Accepted.
+
+## 2026-07-28: Run-token-authorized first-run panel setup
+- Decision: Keep the existing run-token bootstrap model, add first-user setup status/create routes that close permanently with HTTP 410, refuse account creation while edge-bound, and complete TOTP through a temporary setup session with verification before persistence or an explicit consequence-confirmed skip. See ADR 0025.
+- Reason: Direct verification disproved the original claim that a userless panel was unauthenticated; the run token already protects every API and is proven by immutable anti-vacuity gates. The administrator-minting path still needs one-time closure, exposure refusal, and shared throttling.
+- Alternatives considered: unauthenticated setup, pre-setup API lockdown, reusable admin setup, edge-bound setup, and storing an unverified TOTP seed.
+- Consequence: The run token remains powerful until first-user creation; narrowing it is separate future hardening. Setup events carry no password, TOTP seed, or email. Skipping TOTP keeps tunnel access but blocks exposure.
+- Status: Accepted.
+
+## 2026-07-28: Opt-out anonymous install telemetry with an exhaustive payload
+- Decision: Store a stable setup-generated UUID and opt-out preference, send at most daily in a best-effort background stdlib request, keep the built-in endpoint empty, honor `WPFY_TELEMETRY=0`, and restrict the payload exactly to install ID, wpfy/Python/OS versions, site count, and active-site count. See ADR 0026.
+- Reason: Install/environment counts can guide compatibility work, but domains and operator/site identifiers are commercially sensitive. Visibility, an exact key contract, easy disablement, an inert endpoint, and failure isolation are mandatory for an opt-out choice.
+- Alternatives considered: opt-in, domain hashes, an analytics SDK, synchronous retries, and per-process install IDs.
+- Consequence: Nothing is received until a service URL is deliberately configured. Adding a payload field requires an ADR amendment and test change; sender failure never changes panel/CLI output or exit status.
+- Status: Accepted.

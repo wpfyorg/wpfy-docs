@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### First-run panel setup and anonymous telemetry (2026-07-28)
+- Added a run-token-authorized first-run wizard for the initial administrator, separate licence and telemetry choices, permanent HTTP 410 setup closure, edge-bound refusal, shared client throttling, and a 12-character password minimum.
+- Added profile fields, private install state, verified TOTP QR enrollment with explicit skip consequences, and pinned MIT QRCode.js provenance without relaxing CSP.
+- Added the exhaustive anonymous install payload, daily best-effort stdlib sender, empty built-in endpoint, environment override, exact-payload status output, and enable/disable controls. See ADRs 0025 and 0026.
+
 ### Phase 6 Native Path-Jailed File Manager (2026-07-27)
 - Added native per-site file operations restricted to `app/`, with traversal rejection, `lstat` symlink-component refusal, retained directory descriptors, no-follow descriptor-relative operations, atomic writes/uploads, site-UID ownership, safe chmod modes, and typed non-empty-directory deletion.
 - Added panel browse/edit/upload/download/mkdir/rename/chmod/delete routes, pre-read upload limits, size-coherent editor JSON limits, and forced sanitized octet-stream attachment downloads.

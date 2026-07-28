@@ -8,6 +8,7 @@
 - Relevant command docs in `docs/commands/`
 
 ## Current State
+- The first panel administrator now comes from a run-token-authorized browser wizard. Setup routes return HTTP 410 after creation, edge-bound setup is refused, verified TOTP or an explicit skip completes the flow, and anonymous telemetry remains inert until an endpoint is configured. `wpfy telemetry status` prints the exact seven-field payload; see ADRs 0025 and 0026.
 - The repo has a runnable Python CLI and Ubuntu installer for Docker-backed WordPress/server administration.
 - Phase F bounds SSL discovery, Docker health inspection, and no-op registry writes. Local proof covers exact parser/opener/inspect/write counts plus full regression; real disposable-VPS timing remains optional and deferred.
 - Commands now have real implementations for installer bootstrap, per-site Compose scaffolds, Traefik, SSL preflight, full WordPress provisioning, backups, restore, diagnostics, and SFTP lifecycle.

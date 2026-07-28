@@ -27,25 +27,25 @@ matches.
 
 ## Steps — tunnel (default)
 
-1. On your workstation:
+1. Start `wpfy panel` on the server. On a fresh install it prints a URL with a one-time bootstrap run-token fragment.
+2. On your workstation:
    ```
    ssh -L 8642:127.0.0.1:8642 <server>
    ```
-2. Open `http://127.0.0.1:8642` locally.
-3. Sign in with your panel user.
+3. Open the printed URL locally. If no users exist, complete the two-step wizard: create the administrator, then verify TOTP or explicitly confirm the skip consequence. After account creation, setup closes permanently and later visits use the normal sign-in screen.
+4. Sign in with your panel user.
 
 Nothing is installed and nothing is exposed. Close the SSH session to revoke
 access.
 
 ## Steps — exposure (opt-in)
 
-1. Create at least one named user and enrol a TOTP factor:
+1. Complete first-run setup through the SSH tunnel and enrol a TOTP factor. The CLI user/TOTP commands remain available for later users and recovery:
    ```
    wpfy panel user add <username> --role admin
    wpfy panel totp enable <username>
    ```
-   Exposure is refused until a factor exists. This is not advisory — the command
-   stops.
+   Exposure is refused until a factor exists. This is not advisory — the command stops. Account creation is also refused if an unconfigured panel is started in edge-service mode; return to the tunnel.
 2. Point a DNS A/AAAA record for the panel domain at the VPS.
 3. Configure the exposure router. The domain must be typed twice — `--confirm`
    has to match `--domain` exactly:
@@ -92,6 +92,8 @@ while it is running. That is fail2ban acting, on a jail you turned on by name.
 
 ## Recovery
 
+- Setup URL returns HTTP 410: expected after the first user exists. Sign in normally; use `wpfy panel user ...` for later users or recovery.
+- Skipped TOTP during setup: tunnel access still works, but exposure remains refused. Enrol later from the account panel or with `wpfy panel totp enable <username>`.
 - Exposed the panel and want it gone now: `wpfy panel expose --disable`, then
   confirm the generated router file is absent from the Traefik dynamic
   configuration directory.
