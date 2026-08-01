@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Live-verification tour and shipped fixes (2026-08-01)
+- Completed the live-verification tour for the panel HTTP surface; the shipped behavior is verified on a live server rather than only by offline tests.
+- Fixed L13 so FlyingPress purge uses the registered `purge-everything` subcommand; the plugin cache is now actually purged on FlyingPress sites.
+- Fixed L12 so `cache.purge` records per-layer status and reports `partial` when only some layers clear instead of claiming `outcome: ok` for every layer.
+- Fixed L8 so the rendered Traefik static configuration is authoritative; configured ACME addresses reach the running proxy and the required force-recreate is no longer skipped.
+- Fixed L7 so panel failed-login throttling resolves the real client through the trusted edge instead of locking out every operator behind the proxy.
+- Fixed L9 by adding `--token-file` and `WPFY_PANEL_TOKEN`; `--token` remains accepted but warns because it exposes the token in the process table.
+- Fixed L11 so disabling the Redis object cache removes the orphaned container instead of leaving it running.
+- Closed L6 as a non-defect because cron timers were never installed, and kept L5 retracted because per-site cron is positively proven to run inside the site's own container.
+
 ### First-run panel setup and anonymous telemetry (2026-07-28)
 - Added a run-token-authorized first-run wizard for the initial administrator, separate licence and telemetry choices, permanent HTTP 410 setup closure, edge-bound refusal, shared client throttling, and a 12-character password minimum.
 - Added profile fields, private install state, verified TOTP QR enrollment with explicit skip consequences, and pinned MIT QRCode.js provenance without relaxing CSP.

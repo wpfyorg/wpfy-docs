@@ -364,3 +364,9 @@
 - The final filesystem audit moved shared managed-site `.env` reads and compose/environment/Nginx scaffold writes to descriptor-relative no-follow operations, closing both pre-guard reads and post-validation symlink swaps across create, update, SSL, and ownership paths.
 - Verification on the working tree: 356 focused and 475 full pytest tests passed; `tests/wordpress-hardening.sh`, sdist/wheel build, type-hint import smoke, docs QA/build, Graphify refresh/query, app/docs diff checks, and the 71-finding flake8 7.3 baseline passed. Manual disposable-root QA independently reconstructed SigV4, preserved external WordPress and restore symlink sentinels, accepted a valid CLI remote restore, rejected a truncated archive before runtime stop, and removed all remote temporary files.
 - Real S3-provider interoperability and disposable-VPS create/retry/restore validation remain deferred because no provider credentials or target host were supplied. Multipart/resumable transfer, WP-CLI artifact verification, and restore expansion limits remain out of scope.
+
+## 2026-08-01 - Live-verification tour and shipped fixes
+- Completed the live-verification tour for the panel HTTP surface; the live server confirmed the shipped behavior beyond offline tests.
+- Fixed L13 FlyingPress purge to use `purge-everything`, fixed L12 cache purge reporting to preserve per-layer status and a `partial` outcome, and fixed L8 so rendered Traefik static configuration reaches the running proxy and triggers the required force-recreate.
+- Fixed L7 failed-login throttling to resolve the real client through the trusted edge, fixed L9 token handling with `--token-file` and `WPFY_PANEL_TOKEN` while warning on `--token`, and fixed L11 so disabling Redis does not leave an orphaned container.
+- Resolved L6 as a non-defect because cron timers were never installed, and kept L5 retracted because per-site cron is positively proven to run inside the site's own container.

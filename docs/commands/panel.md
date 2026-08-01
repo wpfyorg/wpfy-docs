@@ -2,6 +2,15 @@
 
 The loopback-only panel exposes site operations through an authenticated JSON API. Start it on the server and use an SSH tunnel for remote browser access; the panel does not bind to a public interface.
 
+## Token input
+
+```text
+wpfy panel --token-file <path>
+WPFY_PANEL_TOKEN=<token> wpfy panel
+```
+
+The panel accepts the bearer token through `--token-file` or `WPFY_PANEL_TOKEN`. The file form keeps the token out of the process table. The legacy `--token` option remains accepted for compatibility but now emits a warning because command-line arguments are visible in the process table.
+
 ## First-run setup
 
 On an install with no panel users, `wpfy panel` prints a URL containing a run-token fragment. The browser uses that token to call:
@@ -71,11 +80,11 @@ A paid/BYO selection is a successful expected state, not an error: the response 
 
 `POST /api/sites/<domain>/cache/purge` reports a result for each layer in `outcomes`:
 
-- `plugin` — the active plugin's WP-CLI purge command, if one is known;
+- `plugin` — the active plugin's WP-CLI purge command, if one is known; FlyingPress uses its registered `purge-everything` subcommand;
 - `nginx` — wpfy's owned nginx cache directories;
 - `redis` — the site's Redis service when object caching is enabled.
 
-A missing plugin command is reported as `skipped`, while owned-layer failures remain `error`. The endpoint returns a failing HTTP status when any layer fails and includes the layer name and message; it never reports a failed purge as successful. A fully successful or intentionally skipped purge returns HTTP 200 with `state: "purged"`.
+Each layer reports its own status. A missing plugin command is reported as `skipped`, while owned-layer failures remain `error`. The `cache.purge` audit record preserves the same per-layer detail. When at least one applicable layer clears and another applicable layer does not, the overall purge outcome is `partial`, not `ok`; the layer name and message remain in the response and audit detail. A fully successful purge, including one with intentionally non-applicable layers, remains HTTP 200 with `state: "purged"`.
 
 Responses contain cache metadata and operation outcomes only. They do not expose `.env` credentials or other site secrets.
 

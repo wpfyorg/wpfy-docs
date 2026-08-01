@@ -35,7 +35,7 @@ wpfy stack install --nginx --php --mysql --redis --wpcli
 - Helper image pulls use `phpmyadmin:5-apache`, `adminer:5`, and `composer:2`; they do not publish a dashboard or attach to sites.
 
 ## Idempotency Behaviour
-- Re-running regenerates the Traefik scaffold as needed, reuses the shared network, and restarts/pulls components without duplicating site resources.
+- Re-running renders the Traefik static configuration and treats that file as authoritative. A changed ACME address reaches the running proxy and triggers the required force-recreate; the shared network is reused and site resources are not duplicated.
 
 ## Failure Modes
 - Docker unavailable.

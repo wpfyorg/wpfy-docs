@@ -39,7 +39,7 @@ wpfy cache example.com object redis
 wpfy cache example.com object none
 ```
 
-Redis Object Cache is installed, configured for the site's private `redis` Compose service, and enabled with WP-CLI. The generated Compose service has no `ports:` mapping and is not reachable through the host. `none` disables the plugin and removes the Redis service on the next scaffold refresh.
+Redis Object Cache is installed, configured for the site's private `redis` Compose service, and enabled with WP-CLI. The generated Compose service has no `ports:` mapping and is not reachable through the host. `none` disables the plugin, removes the Redis service on the next scaffold refresh, and does not leave the previous Redis container running.
 
 Page and object selection are independent, so this is valid:
 
@@ -50,7 +50,7 @@ wpfy cache example.com object redis
 
 ## Purge
 
-`purge` first attempts the active plugin's WP-CLI flush command. It then always clears wpfy's Nginx cache directories and the site's Redis layer when enabled. A missing or renamed plugin command does not prevent the owned layers from being cleared; an owned-layer failure returns non-zero.
+`purge` first attempts the active plugin's WP-CLI purge command. FlyingPress uses the registered `purge-everything` subcommand. It then always clears wpfy's Nginx cache directories and the site's Redis layer when enabled. The result reports each layer separately (`plugin`, `nginx`, and `redis` when enabled), including skipped or error status. If at least one applicable layer clears and another applicable layer does not, the overall outcome is `partial` rather than `ok`; an owned-layer failure still returns non-zero.
 
 ## Create/update shortcuts
 
