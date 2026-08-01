@@ -216,3 +216,17 @@
 - Alternatives considered: opt-in, domain hashes, an analytics SDK, synchronous retries, and per-process install IDs.
 - Consequence: Nothing is received until a service URL is deliberately configured. Adding a payload field requires an ADR amendment and test change; sender failure never changes panel/CLI output or exit status.
 - Status: Accepted.
+
+## 2026-08-01: ACME contact email resolution and applied state
+- Decision: Resolve the ACME contact by valid environment value, persisted `acme.env`, valid existing rendered value, then default; expose it through `wpfy stack acme-email`. Treat `traefik.yml` as authoritative for static-config drift and use the recorded hash only to determine whether the running container loaded an already-current file. See ADR 0027.
+- Reason: Defect #11 let a render without the environment variable downgrade a configured address, while L8 showed that a recorded hash could disagree with the rendered file and suppress the restart Traefik requires for static configuration.
+- Alternatives considered: require the environment value on every command, ignore an existing rendered migration value, trust the recorded hash alone, or recreate Traefik on every stack install.
+- Consequence: Configured addresses survive later renders; a file mismatch always requires an apply; unchanged static configuration does not restart the shared edge.
+- Status: Accepted.
+
+## 2026-08-01: Trusting a forwarded client address in the panel
+- Decision: Honour a forwarded panel client address only when the socket peer belongs to the discovered edge network, then walk the chain right-to-left past trusted hops; otherwise key failed-login throttling on the peer. See ADR 0028.
+- Reason: The socket peer is Traefik for every exposed-panel request, which turned a per-client cooldown into one global bucket, while unconditional header trust would let callers evade their own cooldown or pin one onto another address.
+- Alternatives considered: keep the proxy-keyed bucket, trust the header unconditionally, use the leftmost forwarded value, or trust the header when edge discovery fails.
+- Consequence: Remote callers receive distinct buckets when the edge is known; direct callers cannot spoof their key; discovery failure safely degrades to the previous shared-peer behavior.
+- Status: Accepted.
