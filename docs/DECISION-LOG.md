@@ -231,9 +231,23 @@
 - Consequence: Remote callers receive distinct buckets when the edge is known; direct callers cannot spoof their key; discovery failure safely degrades to the previous shared-peer behavior.
 - Status: Accepted.
 
+## 2026-08-02: Serving the WP Rocket page cache from nginx
+- Decision: Render an adapted Rocket-Nginx 3.1.2 block into `wpfy-cache.conf` for `page_cache=wp-rocket` so nginx serves WP Rocket's cached HTML without PHP, with `$wpfy_skip_cache` as the sole authority on cache eligibility, no pre-gzipped variants, and the vhost security headers re-emitted inside the cached-HTML location. Purge gains a `rocket` layer that deletes the files regardless of the plugin command's exit status. See ADR 0029.
+- Reason: wpfy's server-side contribution for WP Rocket was inert — `fastcgi_cache_bypass` means nothing without a FastCGI zone — so every request still traversed PHP. A cached file served by nginx is never seen by WordPress, so the bypass rules must live in one place or a logged-in visitor can be handed another visitor's page.
+- Alternatives considered: vendor upstream's PHP parser and per-site `.ini`, keep upstream's own cookie/method conditions alongside wpfy's, add the query-string ignore lists, override `location /`, or leave purge to the plugin.
+- Consequence: Anonymous hits report `X-Wpfy-Cache: HIT` with no PHP involvement; `_bypass_conditions()` now governs WP Rocket too; any header added to the vhost must go through `BASE_SECURITY_HEADERS` or cached pages lose it. Query strings still bypass cache, which upstream avoids for tracking parameters.
+- Status: Accepted.
+
 ## 2026-08-05: Reconcile interactive security controls with the running edge
 - Decision: Treat a successful interactive security mutation as applied to the running edge: reload Nginx for snippet-carried controls, and force-recreate `web` for Cloudflare-only label changes only when the running `traefik.` label slice differs from the rendered slice. Stage changes successfully when `web` is stopped or runtime application is unavailable, and report genuine running-container failures as not applied so retries converge. See ADR 0016.
 - Reason: Persisted state is written before runtime reconciliation, so the previous persisted-state `current != desired` guard could suppress retries after a failed apply. Applying only when the running edge is stale keeps the operator-visible success contract truthful without disrupting already-applied containers.
 - Alternatives considered: Recreate `web` on every change regardless of state; keep the persisted-state `current != desired` guard; compare the full label set exactly; or detect stale labels by substring-matching `cloudflare-only` / `ipallowlist`.
 - Consequence: Security controls become active on the running edge after successful interactive mutations, stale Cloudflare-only labels are revoked as well as missing labels, and stopped sites apply on next start. Compose/image labels outside the `traefik.` slice do not cause needless recreation. See ADR 0016.
+- Status: Accepted.
+
+## 2026-08-05: Trust only Traefik container addresses for forwarded client data
+- Decision: Render Traefik's inspected `/32` and `/128` addresses on `wpfy`, plus Cloudflare ranges only for proxied/Cloudflare-only sites. After every successful edge start, re-render all managed sites and reload only changed running nginx services.
+- Reason: The shared subnet contains every site's web container; trusting it lets a neighbouring site select another site's logged, denied, rate-limited, and fail2ban-banned client address.
+- Alternatives considered: Trust the shared CIDR; trust a hostname; require manual refresh after every edge recreate.
+- Consequence: A refresh failure makes edge start non-zero and is retryable. An out-of-band Traefik address change without a subsequent wpfy edge start leaves a site attributing requests to Traefik until refresh; it does not widen forwarded-header trust. ADR 0016 amended.
 - Status: Accepted.

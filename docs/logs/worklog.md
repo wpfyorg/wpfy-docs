@@ -1,5 +1,11 @@
 # Worklog
 
+## 2026-08-05 - Per-site security controls reach the running edge
+- Corrected runtime convergence: stopped sites stage reload controls and report startup application, while Cloudflare-only compares live `web` labels and skips matching state; stale or unreadable labels still trigger recreation.
+- Made basic-auth, deny-IP, user-agent, and login-rate-limit mutations reload the affected Nginx service after successful render; made Cloudflare-only force-recreate `web` after regenerating its Traefik labels.
+- A runtime failure now returns non-success while preserving staged state and explicitly reports that configuration was not applied; repeat CLI and panel requests retry application safely.
+- Preserved scaffold-time/file-only security rendering and offline `WPFY_SKIP_RUNTIME` or unavailable-Docker behavior. Verified protected mocked and real-Docker F1 gates plus focused regression coverage.
+
 ## 2026-07-28 - First-run panel setup and telemetry
 - Added private install state, forward-compatible user profile fields, run-token setup status/create routes, permanent post-setup closure, edge refusal, shared client throttling, and a 12-character password minimum.
 - Added a responsive two-step wizard with separate licence/telemetry choices, verified TOTP enrollment, explicit skip consequences, and pinned MIT QRCode.js provenance under the unchanged CSP.
@@ -370,3 +376,16 @@
 - Fixed L13 FlyingPress purge to use `purge-everything`, fixed L12 cache purge reporting to preserve per-layer status and a `partial` outcome, and fixed L8 so rendered Traefik static configuration reaches the running proxy and triggers the required force-recreate.
 - Fixed L7 failed-login throttling to resolve the real client through the trusted edge, fixed L9 token handling with `--token-file` and `WPFY_PANEL_TOKEN` while warning on `--token`, and fixed L11 so disabling Redis does not leave an orphaned container.
 - Resolved L6 as a non-defect because cron timers were never installed, and kept L5 retracted because per-site cron is positively proven to run inside the site's own container.
+
+## 2026-08-05 - F2 Traefik trust sources
+
+- Replaced shared-network real-IP trust with inspected Traefik `/32` and `/128` addresses; proxied-site Cloudflare ranges now feed both real-IP and forwarded-scheme source sets.
+- Edge startup refreshes trust snippets for all managed sites and reloads only changed running nginx services. A refresh failure returns non-zero for retry.
+
+## 2026-08-02 - WP Rocket page cache served from nginx
+- Implemented the directed rocket-nginx integration: `page_cache=wp-rocket` now renders an adapted Rocket-Nginx 3.1.2 block (MIT) into `nginx/extra/wpfy-cache.conf`, so an anonymous hit is answered from WP Rocket's cache file with no PHP, WordPress or MySQL in the request path. wpfy's server-side configuration for this option was previously inert — it emitted `fastcgi_cache_bypass` directives that mean nothing without a FastCGI cache zone.
+- Kept `$wpfy_skip_cache` as the sole authority on cache eligibility rather than carrying upstream's own cookie and method conditions, so the two halves cannot drift apart across an upstream release. Dropped the pre-gzipped `.html_gzip` path so Content-Encoding is never set by hand, and dropped upstream's browser CSS/JS/media expiration blocks, which would have been matched ahead of wpfy's own security locations.
+- Fixed an inheritance hazard the change exposed: nginx drops every inherited `add_header` from a location that sets one, so the cached-page location would have served HTML without the site's security headers. The header set now has one definition in `site_layout.py` that both the vhost and the cache snippet read.
+- Added a `rocket` purge layer that deletes the cached files whether or not `wp rocket clean` succeeded, because nginx answers from those files without consulting PHP.
+- Verified against real nginx 1.27 in a container rather than only offline: `nginx -t` accepts the generated vhost, an anonymous GET returns 200 `X-Wpfy-Cache: HIT` with the cached body and the full security header set, and logged-in, comment-author, password-protected-post, POST, query-string and uncached-path requests all return `MISS` and fall through to PHP. Recorded as ADR 0029.
+- Amended two frozen L3 gate cases rather than working around them, at the user's decision after escalation. `test_byo_plugins_emit_no_status_header` rested on a premise that no longer describes `wp-rocket`; `test_snippet_opens_no_location_block` rested on a premise that still holds, but with a remedy broader than its concern. Both were narrowed to the options they still fit and replaced with gates enforcing what they stood in for. Mutation testing caught the amendment being insufficient: deleting one line — the bypass guard — left every case green while making all six bypass conditions decorative, so a gate tracing the rewrite's guard back to `$wpfy_skip_cache` was added. Gates now 256, suite 1369, 13 manifest checksums with 0 mismatches.

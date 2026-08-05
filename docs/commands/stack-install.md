@@ -1,5 +1,7 @@
 # `wpfy stack install`
 
+After Traefik starts, wpfy re-renders each managed site's exact Traefik trust sources and reloads only nginx services whose generated trust snippets changed. A failed refresh makes the command non-zero; retry after correcting Docker/runtime state.
+
 ## Purpose
 Bootstrap or verify runtime stack components.
 
