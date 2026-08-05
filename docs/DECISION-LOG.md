@@ -1,5 +1,12 @@
 # Decision Log
 
+## 2026-08-05: Salt new basic-auth credentials with APR1
+- Decision: Write new `nginx/htpasswd` credentials as fresh-salt APR1 (`$apr1$`) hashes; preserve legacy `{SHA}` entries for nginx compatibility. Restore reapplies `0640` and the site's uid:gid to the credential file.
+- Reason: `{SHA}` is unsalted SHA-1. Python 3.13 removed `crypt`, and wpfy has no stdlib bcrypt or sha512crypt implementation or permitted runtime dependency.
+- Alternatives considered: bcrypt or sha512crypt (not reachable under the runtime/dependency constraints), `openssl passwd` (adds target-host binary dependence), retaining `{SHA}` (unsafe for new credentials).
+- Consequence: New writes are salted and iterated, but APR1 remains MD5-based rather than a modern KDF. Existing credentials still authenticate and operators should rotate them after upgrading. See amended ADR 0016.
+- Status: Accepted.
+
 ## 2026-08-05: Create secret files with final mode
 - Decision: Open managed site `.env` files, stored S3/Cloudflare/SMTP configuration, and downloaded remote archives with mode `0600`; retain existing post-write mode enforcement and ownership behavior.
 - Reason: Opening first with a readable mode creates an owner-only secret file only after a local-readable window; umask cannot be relied on for this boundary.

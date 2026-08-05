@@ -1,5 +1,10 @@
 # Worklog
 
+## 2026-08-05 - Harden restored and new basic-auth credentials
+- Replaced new unsalted `{SHA}` writes with fresh-salt APR1 (`$apr1$`) hashes, which the shipped nginx accepts without a dependency or removed Python `crypt` module.
+- Preserved legacy `{SHA}` authentication, in-place writes for the individual bind mount, and running-nginx reload behavior. Restore now resets `nginx/htpasswd` to `0640` and the shared ownership pass reapplies site uid:gid.
+- APR1 remains MD5-based rather than a modern KDF; upgrade guidance asks operators to rotate existing basic-auth passwords. Protected F6 and preceding security gates are recorded with implementation evidence.
+
 ## 2026-08-05 - Create secret files privately
 - Opened site `.env` files during scaffold regeneration and restore, stored S3/Cloudflare/SMTP configurations, and downloaded remote archives with mode `0600`; retained existing ownership behavior and in-place generated-file writes.
 - Kept health files, nginx snippets, PHP ini files, and other non-secret generated bind mounts at their existing modes. Protected F5 gates verify each secret creation path under `umask(0)`.
