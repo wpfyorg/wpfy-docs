@@ -3,10 +3,9 @@
 ## 2026-08-05 - Validate site field vocabularies before persistence
 - Added shared PHP, Let's Encrypt, and DNS-provider vocabulary checks at the
   create/update lifecycle choke points before preflight, scaffold rendering, or
-  writes; `off` now disables SSL during create rather than enabling it.
-- CLI argparse and panel boundary checks consume the same constants. Existing
-  valid sites remain updatable; legacy invalid on-disk values can be repaired
-  by setting a supported value, but unrelated updates no longer re-persist them.
+  writes; `off` now disables SSL during create rather than enabling it. Persisted
+  site state is validated before every update or SSL operation.
+- CLI argparse and panel boundary checks consume the same constants.
 
 ## 2026-08-05 - Correct event redaction coverage and boundaries
 - Extended centralized event redaction to boundary-delimited `PWD`, `PASS`,
@@ -22,12 +21,11 @@
 ## 2026-08-05 - Keep WordPress passwords out of argv
 - Generalized the existing database password parser and reused it for `site create --pass` and grouped `site update --password`.
 - Both commands now accept only `-` for one stdin line or `prompt` on a TTY; raw values fail before lifecycle/event work with exit code 2. Fresh `site create` password generation remains unchanged.
-- This deliberately breaks scripts that supplied raw argv passwords. Documentation now gives stdin automation examples and release notes state the migration.
+- Documentation gives stdin automation examples; passwords are never accepted in argv.
 
 ## 2026-08-05 - Harden restored and new basic-auth credentials
-- Replaced new unsalted `{SHA}` writes with fresh-salt APR1 (`$apr1$`) hashes, which the shipped nginx accepts without a dependency or removed Python `crypt` module.
-- Preserved legacy `{SHA}` authentication, in-place writes for the individual bind mount, and running-nginx reload behavior. Restore now resets `nginx/htpasswd` to `0640` and the shared ownership pass reapplies site uid:gid.
-- APR1 remains MD5-based rather than a modern KDF; upgrade guidance asks operators to rotate existing basic-auth passwords. Protected F6 and preceding security gates are recorded with implementation evidence.
+- Replaced new unsalted `{SHA}` writes with OpenSSL sha512crypt (`$6$`) hashes; `openssl passwd -6 -stdin` keeps passwords out of process argv without adding a Python dependency.
+- Hosts without OpenSSL use fresh-salt APR1 (`$apr1$`), and the basic-auth operation event records which scheme was selected. OpenSSL failures fail closed. In-place writes and running-nginx reload behavior remain unchanged; restore resets `nginx/htpasswd` to `0640` and the shared ownership pass reapplies site uid:gid.
 
 ## 2026-08-05 - Create secret files privately
 - Opened site `.env` files during scaffold regeneration and restore, stored S3/Cloudflare/SMTP configurations, and downloaded remote archives with mode `0600`; retained existing ownership behavior and in-place generated-file writes.
@@ -38,7 +36,7 @@
 - Kept `HTTP/1.1` keep-alive unchanged for requests arriving before the timeout. Protected F4 coverage and full panel regression verify the behavior.
 
 ## 2026-08-05 - S3 backup transport and redirect guard
-- Required HTTPS for S3 backup configuration; `--allow-insecure` deliberately persists the only HTTP opt-out as `WPFY_BACKUP_S3_ALLOW_INSECURE=1`, while legacy plaintext files now fail closed with migration guidance.
+- Required HTTPS for S3 backup configuration; `--allow-insecure` deliberately persists the only HTTP opt-out as `WPFY_BACKUP_S3_ALLOW_INSECURE=1`, while plaintext configuration otherwise fails closed.
 - Replaced default `urlopen` with a shared opener that refuses a redirect whose host:port differs from the signed request, keeping SigV4 authorization material at the configured endpoint.
 - Added CLI regression coverage and verified protected F3 endpoint/redirect gates.
 

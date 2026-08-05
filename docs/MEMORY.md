@@ -7,9 +7,7 @@
 ## Implemented
 - Site field vocabulary validation (2026-08-05): lifecycle create/update
   validates PHP image, Let's Encrypt mode, and DNS provider values before
-  preflight or scaffold writes. Legacy invalid on-disk values remain readable
-  but must be explicitly replaced with a supported value before a later
-  lifecycle update can persist them.
+  preflight or scaffold writes, including persisted site state.
 - Event-log redaction correction (2026-08-05): event assignments whose
   boundary-delimited key includes `PWD`, `PASS`, `PASSWORD`, `SECRET`, `TOKEN`,
   `KEY`, `CREDENTIAL`, or `AUTH` now mask full quoted or unquoted values, so
@@ -20,22 +18,18 @@
 - WordPress password argv hardening (2026-08-05): `site create --pass` and
   grouped `site update --password` accept only `-` for one stdin line or
   `prompt` on a TTY. Raw values fail with exit code 2. Omitting `site create
-  --pass` still generates and prints one fresh-install password once. This is
-  an intentional breaking change for scripts; update them to pipe stdin.
+  --pass` still generates and prints one fresh-install password once.
 - Basic-auth credential hardening (2026-08-05): new `nginx/htpasswd` entries
-  use fresh-salt APR1 (`$apr1$`) hashes, accepted by the shipped nginx without
-  a runtime dependency. Legacy `{SHA}` entries keep working but remain
-  unsalted SHA-1 until rotated; operators should rotate passwords after
-  upgrading. Restore reapplies mode `0640` and site uid:gid ownership to the
-  credential file. APR1 is MD5-based and not a modern KDF. See amended ADR
-  0016.
+  use OpenSSL sha512crypt (`$6$`) hashes with password input on stdin. Without
+  OpenSSL, wpfy falls back to fresh-salt APR1 (`$apr1$`) and records the scheme
+  in the operation event. Restore reapplies mode `0640` and site uid:gid
+  ownership to the credential file. See amended ADR 0016.
 - Secret file creation modes (2026-08-05): site `.env`, stored S3/Cloudflare/SMTP
   configuration, and downloaded remote archives now open with mode `0600`, so
-  no umask-dependent readable creation window exists. Existing files are
-  tightened on their next managed rewrite; non-secret generated bind mounts
-  remain unchanged. No ADR required.
+  no umask-dependent readable creation window exists. Non-secret generated
+  bind mounts remain unchanged. No ADR required.
 - Panel slow-client bound (2026-08-05): accepted panel sockets use the module-level `PANEL_SOCKET_TIMEOUT = 30` idle timeout. Incomplete unauthenticated request lines or headers are closed after the timeout; HTTP/1.1 keep-alive remains valid across shorter idle gaps. No architecture change or new dependency.
-- S3 backup transport guard (2026-08-05): S3 endpoints require HTTPS by default; the explicit `backup storage set --allow-insecure` opt-out persists `WPFY_BACKUP_S3_ALLOW_INSECURE=1` for trusted-LAN HTTP only. Legacy plaintext stored config fails closed with migration guidance. The shared S3 opener refuses cross-host redirects, preventing SigV4 headers from reaching another host. See ADR 0030.
+- S3 backup transport guard (2026-08-05): S3 endpoints require HTTPS by default; the explicit `backup storage set --allow-insecure` opt-out persists `WPFY_BACKUP_S3_ALLOW_INSECURE=1` for trusted-LAN HTTP only. Plaintext configuration fails closed unless that opt-out is set. The shared S3 opener refuses cross-host redirects, preventing SigV4 headers from reaching another host. See ADR 0030.
 - Per-site security runtime application (2026-08-05): successful CLI and panel security mutations now mean the running edge has applied them, or that a stopped site has staged the change for startup. Basic auth, deny-IP, user-agent blocks, and login rate limits reload Nginx only for running `web`; Cloudflare-only compares rendered and inspected labels before recreating, skipping an already-applied state. Failed runtime application is non-success but leaves staged state retryable; runtime skip/unavailable Docker behavior remains unchanged. See amended ADR 0016.
 - First-run panel setup and telemetry (2026-07-28): the printed run token authorizes a two-step browser wizard only while no users exist; account setup then closes permanently with HTTP 410, and edge-bound creation is refused. User profiles and install state are mode 0600, TOTP is verified before persistence, skip preserves the existing exposure refusal, and setup events omit credentials/email. Anonymous telemetry is opt-out but strictly limited to install UUID, wpfy/Python/OS versions, and site/active counts; the built-in endpoint is empty, `WPFY_TELEMETRY=0` overrides state, and the CLI prints the exact payload. See ADRs 0025 and 0026.
 - Live-verification tour (2026-08-01): the panel HTTP surface is live-verified. Six shipped fixes are verified live: FlyingPress uses `purge-everything`; cache purge audit records per-layer status and a `partial` outcome when only some layers clear; rendered Traefik static config is authoritative for ACME changes and force-recreate; panel failed-login throttling resolves the real client through the trusted edge; panel tokens support `--token-file` and `WPFY_PANEL_TOKEN` while `--token` warns; and disabling Redis no longer leaves an orphaned container. L6 is a non-defect because cron timers were never installed; L5 remains retracted because per-site cron runs inside its own site container.

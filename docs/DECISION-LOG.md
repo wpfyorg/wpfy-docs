@@ -39,11 +39,11 @@
 - Consequence: Existing automation must pass the password on stdin. Fresh `site create` without `--pass` continues to generate and show one password once. No ADR is required because this hardens CLI input handling without changing architecture.
 - Status: Accepted.
 
-## 2026-08-05: Salt new basic-auth credentials with APR1
-- Decision: Write new `nginx/htpasswd` credentials as fresh-salt APR1 (`$apr1$`) hashes; preserve legacy `{SHA}` entries for nginx compatibility. Restore reapplies `0640` and the site's uid:gid to the credential file.
-- Reason: `{SHA}` is unsalted SHA-1. Python 3.13 removed `crypt`, and wpfy has no stdlib bcrypt or sha512crypt implementation or permitted runtime dependency.
-- Alternatives considered: bcrypt or sha512crypt (not reachable under the runtime/dependency constraints), `openssl passwd` (adds target-host binary dependence), retaining `{SHA}` (unsafe for new credentials).
-- Consequence: New writes are salted and iterated, but APR1 remains MD5-based rather than a modern KDF. Existing credentials still authenticate and operators should rotate them after upgrading. See amended ADR 0016.
+## 2026-08-05: Generate sha512crypt basic-auth credentials
+- Decision: Write new `nginx/htpasswd` credentials as OpenSSL sha512crypt (`$6$`) hashes, passing passwords on stdin. Use fresh-salt APR1 (`$apr1$`) only when OpenSSL is absent, and record the scheme in the basic-auth operation event. Restore reapplies `0640` and the site's uid:gid to the credential file.
+- Reason: sha512crypt is salted and SHA-512 based; `openssl passwd -6 -stdin` is available on supported Ubuntu targets without a Python runtime dependency or process-argv password exposure.
+- Alternatives considered: retaining APR1 as the default (MD5-based), bcrypt (not available without a runtime dependency), retaining `{SHA}` for new credentials (unsalted SHA-1).
+- Consequence: OpenSSL failures fail closed. Hosts lacking OpenSSL receive the explicit APR1 fallback event. Nginx also accepts `{SHA}` entries. See amended ADR 0016.
 - Status: Accepted.
 
 ## 2026-08-05: Create secret files with final mode
@@ -316,5 +316,5 @@
 - Decision: Require HTTPS for S3-compatible backup endpoints, with `backup storage set --allow-insecure` persisting the only deliberate HTTP opt-out. Use a shared uploader opener that rejects redirects to another host:port. See ADR 0030.
 - Reason: Backup archives and SigV4 material are sensitive; warnings leave routine scheduled backups exposed, and urllib otherwise forwards signing headers across a redirect.
 - Alternatives considered: warn but permit HTTP, strip credentials and follow cross-host redirects, and guard only today's GET methods.
-- Consequence: Legacy plaintext configs fail closed until operators migrate to HTTPS or consciously accept `--allow-insecure`; redirecting providers must use their final endpoint.
+- Consequence: Plaintext configs fail closed unless `--allow-insecure` consciously accepts that risk; redirecting providers must use their final endpoint.
 - Status: Accepted.
