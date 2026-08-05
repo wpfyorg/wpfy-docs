@@ -11,7 +11,7 @@ Site archives include database dumps and WordPress secrets. An explicit `http://
 
 Require HTTPS when loading or writing S3 backup configuration. `wpfy backup storage set --allow-insecure` is the sole HTTP opt-out and persists `WPFY_BACKUP_S3_ALLOW_INSECURE=1`. Existing stored HTTP endpoints fail closed and name the opt-out for deliberate migration.
 
-Use one S3-specific urllib opener for every uploader verb. It refuses redirects to a different host:port before forwarding any request, so authorization, `x-amz-date`, and payload-hash headers remain at the configured endpoint.
+Use one S3-specific urllib opener for every uploader verb. It refuses redirects that change scheme or host:port before forwarding any request, so authorization, `x-amz-date`, and payload-hash headers remain at the configured endpoint and never move from HTTPS to plaintext HTTP.
 
 ## Alternatives considered
 
@@ -22,4 +22,4 @@ Use one S3-specific urllib opener for every uploader verb. It refuses redirects 
 ## Consequences
 
 - Operators with legacy HTTP storage must migrate the endpoint to HTTPS or explicitly accept the plaintext risk by reconfiguring with `--allow-insecure`.
-- Cross-host redirecting S3 providers fail with a clear transfer error and must be configured with their final endpoint.
+- S3 providers that redirect across hosts, ports, or schemes fail with a clear transfer error and must be configured with their final endpoint.
