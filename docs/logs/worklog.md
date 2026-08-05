@@ -1,5 +1,10 @@
 # Worklog
 
+## 2026-08-05 - Keep WordPress passwords out of argv
+- Generalized the existing database password parser and reused it for `site create --pass` and grouped `site update --password`.
+- Both commands now accept only `-` for one stdin line or `prompt` on a TTY; raw values fail before lifecycle/event work with exit code 2. Fresh `site create` password generation remains unchanged.
+- This deliberately breaks scripts that supplied raw argv passwords. Documentation now gives stdin automation examples and release notes state the migration.
+
 ## 2026-08-05 - Harden restored and new basic-auth credentials
 - Replaced new unsalted `{SHA}` writes with fresh-salt APR1 (`$apr1$`) hashes, which the shipped nginx accepts without a dependency or removed Python `crypt` module.
 - Preserved legacy `{SHA}` authentication, in-place writes for the individual bind mount, and running-nginx reload behavior. Restore now resets `nginx/htpasswd` to `0640` and the shared ownership pass reapplies site uid:gid.

@@ -1,5 +1,12 @@
 # Decision Log
 
+## 2026-08-05: Reject WordPress passwords in command-line arguments
+- Decision: `site create --pass` and grouped `site update --password` accept only `-` for one stdin line or `prompt` from a TTY; raw values return exit code 2.
+- Reason: Every local user can inspect process argv, so a raw WordPress administrator password can lead to wp-admin access and then site PHP execution.
+- Alternatives considered: retain raw values during a transition (continues the disclosure), or add a separate parser (would drift from the existing database password standard).
+- Consequence: Existing automation must pass the password on stdin. Fresh `site create` without `--pass` continues to generate and show one password once. No ADR is required because this hardens CLI input handling without changing architecture.
+- Status: Accepted.
+
 ## 2026-08-05: Salt new basic-auth credentials with APR1
 - Decision: Write new `nginx/htpasswd` credentials as fresh-salt APR1 (`$apr1$`) hashes; preserve legacy `{SHA}` entries for nginx compatibility. Restore reapplies `0640` and the site's uid:gid to the credential file.
 - Reason: `{SHA}` is unsalted SHA-1. Python 3.13 removed `crypt`, and wpfy has no stdlib bcrypt or sha512crypt implementation or permitted runtime dependency.

@@ -5,6 +5,11 @@
 - Target install UX: `curl -fsSL https://raw.githubusercontent.com/wpfyorg/wpfy/main/install.sh | sudo bash`.
 
 ## Implemented
+- WordPress password argv hardening (2026-08-05): `site create --pass` and
+  grouped `site update --password` accept only `-` for one stdin line or
+  `prompt` on a TTY. Raw values fail with exit code 2. Omitting `site create
+  --pass` still generates and prints one fresh-install password once. This is
+  an intentional breaking change for scripts; update them to pipe stdin.
 - Basic-auth credential hardening (2026-08-05): new `nginx/htpasswd` entries
   use fresh-salt APR1 (`$apr1$`) hashes, accepted by the shipped nginx without
   a runtime dependency. Legacy `{SHA}` entries keep working but remain

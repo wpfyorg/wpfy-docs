@@ -1,0 +1,33 @@
+# `wpfy site update`
+
+## Purpose
+Update a managed site's PHP, cache, SSL, or WordPress administrator password settings.
+
+## Status
+- Implemented: grouped compatibility surface for managed-site updates.
+- Implemented: password rotation accepts stdin or a TTY prompt without accepting a raw argv password.
+
+## Syntax
+```bash
+wpfy site update <domain> [--php <version>] [--wpredis] [-le [provider]]
+wpfy site update <domain> [--password [-|prompt]]
+```
+
+## Examples
+```bash
+wpfy site update example.com --php 8.4
+wpfy site update example.com --wpredis
+# Non-interactive automation: read exactly one password line from stdin.
+printf '%s\n' "$WPFY_ADMIN_PASSWORD" | wpfy site update example.com --password -
+wpfy site update example.com --password prompt
+```
+
+## Password Behaviour
+- `--password -` reads one password line from stdin.
+- `--password prompt` (or `--password` without a value) prompts only from a TTY.
+- Raw `--password <password>` values are rejected with exit code 2 so passwords
+  never appear in process argv.
+
+## Compatibility
+- This is an intentional breaking security change for scripts that passed raw
+  `--password` values. Replace them with stdin input before upgrading.

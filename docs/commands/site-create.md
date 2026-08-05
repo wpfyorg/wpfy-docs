@@ -4,7 +4,7 @@
 Create a managed site using concise CLI flags and Docker/Compose-backed runtime resources.
 
 ## Status
-- Implemented: CLI parsing for site type flags, `-le`/`--letsencrypt`, and WordPress admin flags `--user`, `--email`, `--pass`.
+- Implemented: CLI parsing for site type flags, `-le`/`--letsencrypt`, and WordPress admin flags `--user`, `--email`, `--pass [-|prompt]`.
 - Implemented: idempotent per-site Compose generation for site, PHP, MySQL, Redis, Nginx, and WP-CLI services.
 - Implemented: runtime start attempt when Docker and Compose are available.
 - Implemented: DNS/IP SSL preflight before any site file changes when `-le`/`--letsencrypt` is requested.
@@ -23,7 +23,7 @@ Create a managed site using concise CLI flags and Docker/Compose-backed runtime 
 wpfy site create <domain> --wp
 wpfy site create <domain> --wp -le
 wpfy site create <domain> --wpredis
-wpfy site create <domain> --wp --user=admin --email=admin@example.com --pass='secret'
+wpfy site create <domain> --wp --user=admin --email=admin@example.com [--pass [-|prompt]]
 ```
 
 ## Examples
@@ -32,7 +32,17 @@ wpfy site create example.com --wp
 wpfy site create example.com --wp -le
 wpfy site create example.com --wpredis
 wpfy site create example.com --wp --user=admin
+# Non-interactive automation: read exactly one password line from stdin.
+printf '%s\n' "$WPFY_ADMIN_PASSWORD" | wpfy site create example.com --wp --pass -
 ```
+
+## Password Behaviour
+- Omitting `--pass` preserves the existing fresh-install behavior: wpfy generates
+  a password and prints it exactly once.
+- `--pass -` reads one password line from stdin for non-interactive automation.
+- `--pass prompt` (or `--pass` without a value) prompts only from a TTY.
+- Raw `--pass <password>` values are rejected with exit code 2 so passwords do
+  not appear in the process table.
 
 ## Expected Files Touched
 - Implemented: `/opt/wpfy/sites/<domain>/compose.yaml`.
@@ -58,6 +68,8 @@ wpfy site create example.com --wp --user=admin
 - Implemented: `WPFY_SKIP_WORDPRESS_DOWNLOAD=1` is an explicit offline fixture; unexpected bootstrap errors never fall back to exit-0 placeholders.
 - Implemented: missing or malformed release metadata/digest and digest mismatch fail closed before archive extraction; retry reuses the existing scaffold and secrets.
 - Implemented: unsafe destination symlinks fail closed without changing their external targets; the ownership pass also rejects symlinks before runtime start, and a partial retry with active containers fails before download or copy.
+- Implemented: raw `--pass <password>` is rejected with exit code 2; use
+  `--pass -` or `--pass prompt`.
 
 ## Security Notes
 - Must create per-site PHP, DB, Redis, network, and volumes.

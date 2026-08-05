@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Password argv hardening (2026-08-05)
+- **Breaking:** `wpfy site create --pass` and grouped `wpfy site update --password`
+  now reject raw password values. Use `-` for one stdin line or `prompt` from a
+  TTY; this keeps WordPress administrator passwords out of process argv.
+
+### Panel connection timeout (2026-08-05)
+- Accepted panel sockets use a 30-second idle timeout, bounding incomplete request lines and headers before authentication.
+- HTTP/1.1 keep-alive remains available when the next request arrives before that idle timeout.
+
 ### Live-verification tour and shipped fixes (2026-08-01)
 - Completed the live-verification tour for the panel HTTP surface; the shipped behavior is verified on a live server rather than only by offline tests.
 - Fixed L13 so FlyingPress purge uses the registered `purge-everything` subcommand; the plugin cache is now actually purged on FlyingPress sites.
