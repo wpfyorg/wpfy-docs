@@ -5,6 +5,12 @@
 - Target install UX: `curl -fsSL https://raw.githubusercontent.com/wpfyorg/wpfy/main/install.sh | sudo bash`.
 
 ## Implemented
+- Secret file creation modes (2026-08-05): site `.env`, stored S3/Cloudflare/SMTP
+  configuration, and downloaded remote archives now open with mode `0600`, so
+  no umask-dependent readable creation window exists. Existing files are
+  tightened on their next managed rewrite; non-secret generated bind mounts
+  remain unchanged. No ADR required.
+- Panel slow-client bound (2026-08-05): accepted panel sockets use the module-level `PANEL_SOCKET_TIMEOUT = 30` idle timeout. Incomplete unauthenticated request lines or headers are closed after the timeout; HTTP/1.1 keep-alive remains valid across shorter idle gaps. No architecture change or new dependency.
 - S3 backup transport guard (2026-08-05): S3 endpoints require HTTPS by default; the explicit `backup storage set --allow-insecure` opt-out persists `WPFY_BACKUP_S3_ALLOW_INSECURE=1` for trusted-LAN HTTP only. Legacy plaintext stored config fails closed with migration guidance. The shared S3 opener refuses cross-host redirects, preventing SigV4 headers from reaching another host. See ADR 0030.
 - Per-site security runtime application (2026-08-05): successful CLI and panel security mutations now mean the running edge has applied them, or that a stopped site has staged the change for startup. Basic auth, deny-IP, user-agent blocks, and login rate limits reload Nginx only for running `web`; Cloudflare-only compares rendered and inspected labels before recreating, skipping an already-applied state. Failed runtime application is non-success but leaves staged state retryable; runtime skip/unavailable Docker behavior remains unchanged. See amended ADR 0016.
 - First-run panel setup and telemetry (2026-07-28): the printed run token authorizes a two-step browser wizard only while no users exist; account setup then closes permanently with HTTP 410, and edge-bound creation is refused. User profiles and install state are mode 0600, TOTP is verified before persistence, skip preserves the existing exposure refusal, and setup events omit credentials/email. Anonymous telemetry is opt-out but strictly limited to install UUID, wpfy/Python/OS versions, and site/active counts; the built-in endpoint is empty, `WPFY_TELEMETRY=0` overrides state, and the CLI prints the exact payload. See ADRs 0025 and 0026.

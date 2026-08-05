@@ -1,5 +1,19 @@
 # Decision Log
 
+## 2026-08-05: Create secret files with final mode
+- Decision: Open managed site `.env` files, stored S3/Cloudflare/SMTP configuration, and downloaded remote archives with mode `0600`; retain existing post-write mode enforcement and ownership behavior.
+- Reason: Opening first with a readable mode creates an owner-only secret file only after a local-readable window; umask cannot be relied on for this boundary.
+- Alternatives considered: tighten every generated file (breaks non-owner container bind mounts) or rely on umask (not an invariant).
+- Consequence: Existing legacy secret files become `0600` on their next managed rewrite. No ADR is required because this corrects file-write mechanics without changing system architecture.
+- Status: Accepted.
+
+## 2026-08-05: Bound panel idle sockets
+- Decision: Apply module-level `PANEL_SOCKET_TIMEOUT = 30` seconds to every accepted panel connection. The timeout is read when each connection is accepted, allowing tests and future maintenance to tune the constant without adding production configuration.
+- Reason: Request-line and header parsing precede authentication; an incomplete unauthenticated request must not occupy a worker indefinitely.
+- Alternatives considered: an environment variable (unnecessary production surface), changing `HTTP/1.1` to close every connection (breaks deliberate keep-alive), or authenticating before HTTP parsing (not supported by the stdlib handler flow).
+- Consequence: A legitimately slow client that exceeds 30 seconds between bytes is disconnected; normal requests and keep-alive gaps shorter than 30 seconds are unchanged. No ADR is required because this is an operational hardening detail, not an architecture change.
+- Status: Accepted.
+
 ## 2026-05-20: Ubuntu-first v1
 - Decision: Support Ubuntu first for v1.
 - Reason: Minimizes installer and support surface while core Docker architecture is still forming.

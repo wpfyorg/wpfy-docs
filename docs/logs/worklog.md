@@ -1,5 +1,13 @@
 # Worklog
 
+## 2026-08-05 - Create secret files privately
+- Opened site `.env` files during scaffold regeneration and restore, stored S3/Cloudflare/SMTP configurations, and downloaded remote archives with mode `0600`; retained existing ownership behavior and in-place generated-file writes.
+- Kept health files, nginx snippets, PHP ini files, and other non-secret generated bind mounts at their existing modes. Protected F5 gates verify each secret creation path under `umask(0)`.
+
+## 2026-08-05 - Bound panel idle connections
+- Added module-level `PANEL_SOCKET_TIMEOUT = 30`; the panel server applies it to each accepted socket before request parsing, so incomplete unauthenticated lines/headers cannot hold a worker indefinitely.
+- Kept `HTTP/1.1` keep-alive unchanged for requests arriving before the timeout. Protected F4 coverage and full panel regression verify the behavior.
+
 ## 2026-08-05 - S3 backup transport and redirect guard
 - Required HTTPS for S3 backup configuration; `--allow-insecure` deliberately persists the only HTTP opt-out as `WPFY_BACKUP_S3_ALLOW_INSECURE=1`, while legacy plaintext files now fail closed with migration guidance.
 - Replaced default `urlopen` with a shared opener that refuses a redirect whose host:port differs from the signed request, keeping SigV4 authorization material at the configured endpoint.
