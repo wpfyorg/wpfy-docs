@@ -1,5 +1,22 @@
 # Decision Log
 
+## 2026-08-05: Use boundary-delimited secret labels in event redaction
+- Decision: Apply centralized event redaction to assignments labelled `PWD`,
+  `PASS`, `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `CREDENTIAL`, or `AUTH` only
+  when the label is not adjacent to a letter or digit; mask complete quoted or
+  unquoted values.
+- Reason: The prior labels missed cron secrets such as `MYSQL_PWD=...`, while
+  unbounded `KEY` matching corrupted harmless operational diagnostics such as
+  `monkey=12`.
+- Alternatives considered: match space-separated forms (would incorrectly
+  redact prose such as `password reset requested`), or share the exact-value
+  configured-secret helper (it lacks assignment-label context).
+- Consequence: Event log and panel records retain useful text and cover more
+  recognizable secret assignments. This is best-effort pattern matching, not a
+  guarantee: unlabelled secrets can still be logged. No ADR is required because
+  event persistence architecture is unchanged.
+- Status: Accepted.
+
 ## 2026-08-05: Reject WordPress passwords in command-line arguments
 - Decision: `site create --pass` and grouped `site update --password` accept only `-` for one stdin line or `prompt` from a TTY; raw values return exit code 2.
 - Reason: Every local user can inspect process argv, so a raw WordPress administrator password can lead to wp-admin access and then site PHP execution.

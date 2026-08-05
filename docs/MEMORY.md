@@ -5,6 +5,13 @@
 - Target install UX: `curl -fsSL https://raw.githubusercontent.com/wpfyorg/wpfy/main/install.sh | sudo bash`.
 
 ## Implemented
+- Event-log redaction correction (2026-08-05): event assignments whose
+  boundary-delimited key includes `PWD`, `PASS`, `PASSWORD`, `SECRET`, `TOKEN`,
+  `KEY`, `CREDENTIAL`, or `AUTH` now mask full quoted or unquoted values, so
+  cron command secrets do not reach JSONL or the panel. Token boundaries also
+  preserve harmless diagnostics such as `monkey=12` and `authority=high`.
+  This remains best-effort key-pattern matching; a secret with no recognizable
+  key can still be logged. No ADR required.
 - WordPress password argv hardening (2026-08-05): `site create --pass` and
   grouped `site update --password` accept only `-` for one stdin line or
   `prompt` on a TTY. Raw values fail with exit code 2. Omitting `site create

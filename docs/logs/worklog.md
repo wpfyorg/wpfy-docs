@@ -1,5 +1,16 @@
 # Worklog
 
+## 2026-08-05 - Correct event redaction coverage and boundaries
+- Extended centralized event redaction to boundary-delimited `PWD`, `PASS`,
+  `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `CREDENTIAL`, and `AUTH` assignments,
+  consuming full single- or double-quoted values as well as unquoted values.
+  Cron command details remain recorded but no longer retain these secrets in
+  JSONL or the panel.
+- Replaced substring matching with letter/digit token boundaries, preserving
+  harmless diagnostics including `monkey=12` and `authority=high` instead of
+  silently corrupting their values. Redaction remains best-effort: secrets
+  without recognizable assignment keys can still be logged.
+
 ## 2026-08-05 - Keep WordPress passwords out of argv
 - Generalized the existing database password parser and reused it for `site create --pass` and grouped `site update --password`.
 - Both commands now accept only `-` for one stdin line or `prompt` on a TTY; raw values fail before lifecycle/event work with exit code 2. Fresh `site create` password generation remains unchanged.
