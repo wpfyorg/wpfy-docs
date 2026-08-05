@@ -1,5 +1,20 @@
 # Decision Log
 
+## 2026-08-05: Validate site field vocabularies at lifecycle entry
+- Decision: Define one vocabulary for PHP versions, Let's Encrypt modes, and
+  DNS providers; validate create/update requests at the shared lifecycle before
+  any preflight, render, or persistence. CLI and panel perform matching early
+  validation from those same constants.
+- Reason: An unchecked value could write an unusable PHP image tag or silently
+  turn a misspelled wildcard request into ordinary SSL.
+- Alternatives considered: parser-only checks (panel/direct callers bypass
+  them), panel-only checks (CLI/direct callers bypass them), or scattered
+  literals (drift risk).
+- Consequence: Existing invalid stored values remain readable for repair but
+  block unrelated lifecycle updates until replaced by an accepted value. No ADR
+  is required because lifecycle ownership and persisted-state architecture are unchanged.
+- Status: Accepted.
+
 ## 2026-08-05: Use boundary-delimited secret labels in event redaction
 - Decision: Apply centralized event redaction to assignments labelled `PWD`,
   `PASS`, `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `CREDENTIAL`, or `AUTH` only

@@ -146,3 +146,11 @@ The Events view filters by exact domain and action and keeps `job_id` visible fo
 The Services view reports the shared `wpfy-traefik` edge and the services derived for every managed site. A per-site restart accepts only the existing `site_cron` service allowlist for that site (`web`, `app`, and conditional `db`, `redis`, `sftp`, or `adminer`). Validation happens before the service reaches the Compose argument vector, so flag-shaped names, cross-site names, unavailable services, and `wpfy-traefik` are refused without running a restart.
 
 The shared edge has a separate destructive route. It requires the exact JSON body `{"confirm":"wpfy-traefik"}`. The browser states that restarting the edge affects every site and enables the action only after the same typed confirmation.
+
+## Site field vocabularies
+
+Site create/config requests accept PHP `php_version` values `7.4`, `8.0`,
+`8.1`, `8.2`, `8.3`, or `8.4`; Let's Encrypt `letsencrypt` values `default`,
+`wildcard`, or `off`; and `dns_provider` value `cloudflare`. The panel rejects
+unknown values before it creates a job, and the shared site lifecycle validates
+them again before preflight, rendering, or persistence.

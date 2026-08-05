@@ -5,6 +5,11 @@
 - Target install UX: `curl -fsSL https://raw.githubusercontent.com/wpfyorg/wpfy/main/install.sh | sudo bash`.
 
 ## Implemented
+- Site field vocabulary validation (2026-08-05): lifecycle create/update
+  validates PHP image, Let's Encrypt mode, and DNS provider values before
+  preflight or scaffold writes. Legacy invalid on-disk values remain readable
+  but must be explicitly replaced with a supported value before a later
+  lifecycle update can persist them.
 - Event-log redaction correction (2026-08-05): event assignments whose
   boundary-delimited key includes `PWD`, `PASS`, `PASSWORD`, `SECRET`, `TOKEN`,
   `KEY`, `CREDENTIAL`, or `AUTH` now mask full quoted or unquoted values, so

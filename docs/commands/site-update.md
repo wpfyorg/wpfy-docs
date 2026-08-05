@@ -31,3 +31,7 @@ wpfy site update example.com --password prompt
 ## Compatibility
 - This is an intentional breaking security change for scripts that passed raw
   `--password` values. Replace them with stdin input before upgrading.
+- `--php` accepts only `7.4`, `8.0`, `8.1`, `8.2`, `8.3`, or `8.4`;
+  `--letsencrypt` accepts only `default`, `wildcard`, or `off`; and `--dns`
+  accepts only `cloudflare`. The lifecycle validates the final site state
+  before scaffold regeneration.

@@ -58,6 +58,10 @@ printf '%s\n' "$WPFY_ADMIN_PASSWORD" | wpfy site create example.com --wp --pass 
 - Implemented after bootstrap failure: the scaffold/secrets remain reusable, no false-ready file pair is left, and a retry can complete normally.
 
 ## Failure Modes
+- Implemented: `--php` accepts only `7.4`, `8.0`, `8.1`, `8.2`, `8.3`, or
+  `8.4`; `--letsencrypt` accepts only `default`, `wildcard`, or `off`; and
+  `--dns` accepts only `cloudflare`. Lifecycle validation repeats these checks
+  before preflight or any scaffold write.
 - Implemented: invalid domain.
 - Implemented: Docker unavailable results in a runtime/provisioning skip rather than scaffold failure.
 - Implemented: Docker runtime startup failure when Compose returns a non-zero exit.

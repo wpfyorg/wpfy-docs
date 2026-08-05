@@ -1,5 +1,13 @@
 # Worklog
 
+## 2026-08-05 - Validate site field vocabularies before persistence
+- Added shared PHP, Let's Encrypt, and DNS-provider vocabulary checks at the
+  create/update lifecycle choke points before preflight, scaffold rendering, or
+  writes; `off` now disables SSL during create rather than enabling it.
+- CLI argparse and panel boundary checks consume the same constants. Existing
+  valid sites remain updatable; legacy invalid on-disk values can be repaired
+  by setting a supported value, but unrelated updates no longer re-persist them.
+
 ## 2026-08-05 - Correct event redaction coverage and boundaries
 - Extended centralized event redaction to boundary-delimited `PWD`, `PASS`,
   `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `CREDENTIAL`, and `AUTH` assignments,

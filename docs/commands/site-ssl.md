@@ -60,6 +60,9 @@ wpfy site ssl example.com --letsencrypt wildcard --dns cloudflare
 - Re-running SSL enablement keeps the site scaffold consistent and restarts runtime without deleting application data.
 
 ## Failure Modes
+- `--letsencrypt` accepts `default`, `wildcard`, or `off`; `off` is only a
+  disable mode for site create/update and is refused by this enable command.
+  `--dns` accepts only `cloudflare`.
 - ACME contact email not configured or invalid (set `WPFY_ACME_EMAIL`, re-run `wpfy stack install --nginx`).
 - DNS A/AAAA records do not point to this VPS.
 - Public IP detection fails.
