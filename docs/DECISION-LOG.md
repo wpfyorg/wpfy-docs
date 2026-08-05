@@ -17,9 +17,9 @@
 
 ## 2026-08-05: Use boundary-delimited secret labels in event redaction
 - Decision: Apply centralized event redaction to assignments labelled `PWD`,
-  `PASS`, `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `CREDENTIAL`, or `AUTH` only
-  when the label is not adjacent to a letter or digit; mask complete quoted or
-  unquoted values.
+  `PASS`, `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `CREDENTIAL`, `AUTH`, or
+  `AUTHORIZATION` only when the label is not adjacent to a letter or digit;
+  mask complete quoted or unquoted values.
 - Reason: The prior labels missed cron secrets such as `MYSQL_PWD=...`, while
   unbounded `KEY` matching corrupted harmless operational diagnostics such as
   `monkey=12`.
@@ -32,9 +32,9 @@
   event persistence architecture is unchanged.
 - Status: Accepted.
 
-## 2026-08-05: Reject WordPress passwords in command-line arguments
-- Decision: `site create --pass` and grouped `site update --password` accept only `-` for one stdin line or `prompt` from a TTY; raw values return exit code 2.
-- Reason: Every local user can inspect process argv, so a raw WordPress administrator password can lead to wp-admin access and then site PHP execution.
+## 2026-08-05: Reject passwords and panel tokens in command-line arguments
+- Decision: `site create --pass`, grouped `site update --password`, and `sftp --password` accept only `-` for one stdin line or `prompt` from a TTY; raw values return exit code 2. Raw `panel --token` values are refused in favour of `--token-file` or `WPFY_PANEL_TOKEN`.
+- Reason: Every local user can inspect process argv, so a raw WordPress administrator password can lead to wp-admin access and then site PHP execution; SFTP passwords and long-running panel tokens have the same exposure.
 - Alternatives considered: retain raw values during a transition (continues the disclosure), or add a separate parser (would drift from the existing database password standard).
 - Consequence: Existing automation must pass the password on stdin. Fresh `site create` without `--pass` continues to generate and show one password once. No ADR is required because this hardens CLI input handling without changing architecture.
 - Status: Accepted.

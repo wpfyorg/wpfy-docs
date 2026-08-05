@@ -7,6 +7,10 @@
   site state is validated before every update or SSL operation.
 - CLI argparse and panel boundary checks consume the same constants.
 
+## 2026-08-05 - Close password and Authorization sibling gaps
+- Reused the shared password parser for `sftp --password`: `-` reads stdin and `prompt` requires a TTY; omitted SFTP passwords still generate once. Raw panel `--token` now fails in favour of `--token-file` or `WPFY_PANEL_TOKEN`.
+- Extended event redaction with distinct `AUTHORIZATION` matching, masking Bearer and Basic header values while retaining byte-identical `authority=high`, `authored=yes`, and `authorised personnel only` diagnostics.
+
 ## 2026-08-05 - Correct event redaction coverage and boundaries
 - Extended centralized event redaction to boundary-delimited `PWD`, `PASS`,
   `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `CREDENTIAL`, and `AUTH` assignments,

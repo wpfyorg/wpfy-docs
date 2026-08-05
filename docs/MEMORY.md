@@ -10,15 +10,17 @@
   preflight or scaffold writes, including persisted site state.
 - Event-log redaction correction (2026-08-05): event assignments whose
   boundary-delimited key includes `PWD`, `PASS`, `PASSWORD`, `SECRET`, `TOKEN`,
-  `KEY`, `CREDENTIAL`, or `AUTH` now mask full quoted or unquoted values, so
-  cron command secrets do not reach JSONL or the panel. Token boundaries also
-  preserve harmless diagnostics such as `monkey=12` and `authority=high`.
+  `KEY`, `CREDENTIAL`, `AUTH`, or `AUTHORIZATION` now mask full quoted or
+  unquoted values, including HTTP Authorization headers, so cron command
+  secrets do not reach JSONL or the panel. Token boundaries also preserve
+  harmless diagnostics such as `monkey=12` and `authority=high`.
   This remains best-effort key-pattern matching; a secret with no recognizable
   key can still be logged. No ADR required.
-- WordPress password argv hardening (2026-08-05): `site create --pass` and
-  grouped `site update --password` accept only `-` for one stdin line or
-  `prompt` on a TTY. Raw values fail with exit code 2. Omitting `site create
-  --pass` still generates and prints one fresh-install password once.
+- Password argv hardening (2026-08-05): `site create --pass`, grouped `site
+  update --password`, and `sftp --password` accept only `-` for one stdin line
+  or `prompt` on a TTY. Raw values fail with exit code 2. Omitting `site create
+  --pass` or `sftp --password` keeps existing password generation. Raw
+  `panel --token` also fails; use `--token-file` or `WPFY_PANEL_TOKEN`.
 - Basic-auth credential hardening (2026-08-05): new `nginx/htpasswd` entries
   use OpenSSL sha512crypt (`$6$`) hashes with password input on stdin. Without
   OpenSSL, wpfy falls back to fresh-salt APR1 (`$apr1$`) and records the scheme
