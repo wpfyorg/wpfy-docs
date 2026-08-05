@@ -230,3 +230,10 @@
 - Alternatives considered: keep the proxy-keyed bucket, trust the header unconditionally, use the leftmost forwarded value, or trust the header when edge discovery fails.
 - Consequence: Remote callers receive distinct buckets when the edge is known; direct callers cannot spoof their key; discovery failure safely degrades to the previous shared-peer behavior.
 - Status: Accepted.
+
+## 2026-08-05: Reconcile interactive security controls with the running edge
+- Decision: Treat a successful interactive security mutation as applied to the running edge: reload Nginx for snippet-carried controls, and force-recreate `web` for Cloudflare-only label changes only when the running `traefik.` label slice differs from the rendered slice. Stage changes successfully when `web` is stopped or runtime application is unavailable, and report genuine running-container failures as not applied so retries converge. See ADR 0016.
+- Reason: Persisted state is written before runtime reconciliation, so the previous persisted-state `current != desired` guard could suppress retries after a failed apply. Applying only when the running edge is stale keeps the operator-visible success contract truthful without disrupting already-applied containers.
+- Alternatives considered: Recreate `web` on every change regardless of state; keep the persisted-state `current != desired` guard; compare the full label set exactly; or detect stale labels by substring-matching `cloudflare-only` / `ipallowlist`.
+- Consequence: Security controls become active on the running edge after successful interactive mutations, stale Cloudflare-only labels are revoked as well as missing labels, and stopped sites apply on next start. Compose/image labels outside the `traefik.` slice do not cause needless recreation. See ADR 0016.
+- Status: Accepted.
