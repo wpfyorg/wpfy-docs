@@ -16,7 +16,8 @@ Create a backup for one managed site.
 ```bash
 wpfy backup <domain> [--list|--path <directory>|--s3]
 wpfy backup all [--path <directory>] [--s3]
-wpfy backup storage set --endpoint <url> --bucket <name> --region <region> --access-key <key> --secret-key-stdin
+wpfy backup storage set --endpoint <https-url> --bucket <name> --region <region> --access-key <key> --secret-key-stdin
+wpfy backup storage set --allow-insecure --endpoint <http-url> --bucket <name> --region <region> --access-key <key> --secret-key-stdin
 wpfy backup storage status
 wpfy backup storage test
 wpfy backup schedule daily --time HH:MM [--path <directory>] [--s3]
@@ -64,6 +65,8 @@ wpfy site backup example.com
 - Backup archives may contain secrets and must not be world-readable.
 - S3-compatible upload settings come from environment variables: `WPFY_BACKUP_S3_ENDPOINT`, `WPFY_BACKUP_S3_BUCKET`, `WPFY_BACKUP_S3_REGION`, `WPFY_BACKUP_S3_ACCESS_KEY`, `WPFY_BACKUP_S3_SECRET_KEY`, and optional `WPFY_BACKUP_S3_PREFIX`.
 - Stored S3-compatible upload settings live in `/etc/wpfy/backup-storage.env`; environment variables override the file.
+- HTTPS endpoints are mandatory unless `--allow-insecure` was used at storage setup, which persists `WPFY_BACKUP_S3_ALLOW_INSECURE=1`. Plaintext HTTP exposes backup contents and SigV4 credentials. Existing stored `http://` endpoints fail closed until migrated to HTTPS or deliberately reconfigured with that opt-out.
+- Cross-host S3 redirects are refused before any signed request can reach the redirect target.
 - Command output must not print S3 access keys, secret keys, archive contents, SQL contents, `.env` contents, salts, tokens, or passwords.
 - Failed offsite uploads keep the verified local archive. Remote restore downloads in bounded chunks to a private temporary file, rejects malformed, truncated, and `db-data/` archive payloads before live mutation, rejects symlinks in the live restore tree, replaces archive-owned entries without following destination symlinks while preserving the live database volume, and removes the temporary file on success or failure.
 - Remote restore/list/delete/prune, retention, restore-latest, named storage profiles, and Traefik/ACME backup are implemented on the flat `wpfy backup ...` / `wpfy restore ...` surfaces. Provider bucket lifecycle API automation remains deferred.

@@ -251,3 +251,10 @@
 - Alternatives considered: Trust the shared CIDR; trust a hostname; require manual refresh after every edge recreate.
 - Consequence: A refresh failure makes edge start non-zero and is retryable. An out-of-band Traefik address change without a subsequent wpfy edge start leaves a site attributing requests to Traefik until refresh; it does not widen forwarded-header trust. ADR 0016 amended.
 - Status: Accepted.
+
+## 2026-08-05: Require encrypted S3 backup transport and reject cross-host redirects
+- Decision: Require HTTPS for S3-compatible backup endpoints, with `backup storage set --allow-insecure` persisting the only deliberate HTTP opt-out. Use a shared uploader opener that rejects redirects to another host:port. See ADR 0030.
+- Reason: Backup archives and SigV4 material are sensitive; warnings leave routine scheduled backups exposed, and urllib otherwise forwards signing headers across a redirect.
+- Alternatives considered: warn but permit HTTP, strip credentials and follow cross-host redirects, and guard only today's GET methods.
+- Consequence: Legacy plaintext configs fail closed until operators migrate to HTTPS or consciously accept `--allow-insecure`; redirecting providers must use their final endpoint.
+- Status: Accepted.

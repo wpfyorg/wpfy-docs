@@ -1,5 +1,10 @@
 # Worklog
 
+## 2026-08-05 - S3 backup transport and redirect guard
+- Required HTTPS for S3 backup configuration; `--allow-insecure` deliberately persists the only HTTP opt-out as `WPFY_BACKUP_S3_ALLOW_INSECURE=1`, while legacy plaintext files now fail closed with migration guidance.
+- Replaced default `urlopen` with a shared opener that refuses a redirect whose host:port differs from the signed request, keeping SigV4 authorization material at the configured endpoint.
+- Added CLI regression coverage and verified protected F3 endpoint/redirect gates.
+
 ## 2026-08-05 - Per-site security controls reach the running edge
 - Corrected runtime convergence: stopped sites stage reload controls and report startup application, while Cloudflare-only compares live `web` labels and skips matching state; stale or unreadable labels still trigger recreation.
 - Made basic-auth, deny-IP, user-agent, and login-rate-limit mutations reload the affected Nginx service after successful render; made Cloudflare-only force-recreate `web` after regenerating its Traefik labels.
