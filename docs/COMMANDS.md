@@ -31,6 +31,8 @@
 - `wpfy cron install|status|disable`
 - `wpfy smtp set|status|test|clear`
 - `wpfy dns cloudflare set|status|test|clear`
+- `wpfy security fail2ban status|repair|test|unban <ip>` (host Login Shield)
+- `wpfy site security <domain> fail2ban on|off|status|reset` (per-site Login Shield)
 - `wpfy site restore <domain> [<backup>|--list|--latest]`
 - `wpfy restore <domain> [<backup>|--list|--latest]`
 - `wpfy backup prune <domain|all> --keep N [--dry-run]`
@@ -43,7 +45,7 @@
 - `wpfy stack install|remove|purge|migrate|upgrade|status [flags]`
 - `wpfy debug`, `wpfy clean`, `wpfy info`, `wpfy log show|reset|cron`, `wpfy secure`, `wpfy maintenance`, `wpfy update`
 
-Flat commands are the canonical VM/operator target surface where exact equivalents exist. Grouped `wpfy site ...` and `wpfy stack ...` commands are retained for this release; flat `run`, `backup`, `restore`, `wp`, `rm`, and `config` are primary where they match grouped site behavior. `wpfy config` prints sanitized status only and routes mutations through the existing site update path, `wpfy edit --print-path` prints the config path without contents, `wpfy edit` requires an editor and creates a backup, and `wpfy refresh` regenerates scaffold files from authoritative state without restarting unless `--restart` is passed. `wpfy healthcheck` provides plain text operator checks with nonzero exit for failed checks, `wpfy motd` prints a safe login summary, and `wpfy utility` generates offline values without Docker or site mutation. `wpfy backup all`, backup listing, restore listing, explicit latest restore, local pruning, remote S3-compatible list/restore/delete/prune, named storage profiles, edge backup/restore, and one systemd backup timer are implemented. `wpfy dns cloudflare` stores the Cloudflare token used by wildcard SSL. `wpfy cron` runs WordPress due events and small interval health tasks, while automatic cron uses systemd timers per interval; backups remain on `wpfy backup schedule`. `wpfy smtp` stores and tests outbound SMTP settings only and does not send automatic notifications.
+Flat commands are the canonical VM/operator target surface where exact equivalents exist. Grouped `wpfy site ...` and `wpfy stack ...` commands are retained for this release; flat `run`, `backup`, `restore`, `wp`, `rm`, and `config` are primary where they match grouped site behavior. `wpfy config` prints sanitized status only and routes mutations through the existing site update path, `wpfy edit --print-path` prints the config path without contents, `wpfy edit` requires an editor and creates a backup, and `wpfy refresh` regenerates scaffold files from authoritative state without restarting unless `--restart` is passed. `wpfy healthcheck` provides plain text operator checks with nonzero exit for failed checks, `wpfy motd` prints a safe login summary, and `wpfy utility` generates offline values without Docker or site mutation. `wpfy backup all`, backup listing, restore listing, explicit latest restore, local pruning, remote S3-compatible list/restore/delete/prune, named storage profiles, edge backup/restore, and one systemd backup timer are implemented. `wpfy dns cloudflare` stores the Cloudflare token used by wildcard SSL. `wpfy cron` runs WordPress due events and small interval health tasks, while automatic cron uses systemd timers per interval; backups remain on `wpfy backup schedule`. `wpfy smtp` stores and tests outbound SMTP settings only and does not send automatic notifications. `wpfy security fail2ban` operates the shared host fail2ban service (status/repair/test/unban) that backs Login Shield, and `wpfy site security <domain> fail2ban on|off|status|reset` manages the opt-in per-site WordPress Login Shield; see `commands/wpfy-security-fail2ban.md` and amended ADR 0023.
 
 ## Command Docs
 - `commands/runtime.md`
@@ -60,6 +62,7 @@ Flat commands are the canonical VM/operator target surface where exact equivalen
 - `commands/smtp.md`
 - `commands/sftp.md`
 - `commands/stack-install.md`
+- `commands/wpfy-security-fail2ban.md`
 
 ## Deferred Command Surface
 - Grouped `site` and `stack` commands are retained for this release.

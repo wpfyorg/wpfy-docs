@@ -45,8 +45,26 @@
 - Limitation: S3-compatible archive upload is a single request without multipart or resume support.
 - Planned: more explicit restore confirmation or pre-restore backup workflow for existing live sites.
 
+## Login Shield
+- Implemented: WPFY Login Shield protects the panel login and, per-site opt-in, WordPress authentication. Detection is server-side from real authentication failures; enforcement is a host Fail2ban ban. It is not a CAPTCHA: no CAPTCHA, Turnstile, reCAPTCHA, hCaptcha, ALTCHA, browser/device fingerprinting, IP reputation service, or external threat feed is used. Live-verified end to end on the dev host 2026-08-06/07 (16/16 checks PASS, including a real ban and rollback drill). See ADR 0023 (amended) and `runbooks/login-shield.md`.
+- Layer 1, panel (always on, in-process): per-account lockout (5 failures / 5 min) and per-client cooldown (10 failures / 60 s) with HTTP 429 and `Retry-After`; stays active even when Fail2ban is stopped.
+- Layer 2, panel (host jail): jail `wpfy-panel-auth` reads `/var/log/wpfy/panel-auth.log`; policy maxretry 8 / findtime 10m / bantime 15m; `ignoreip` loopback only.
+- WordPress (per-site opt-in, default disabled): `wpfy site security <domain> fail2ban on|off` (or the panel Security tab toggle) enables the official wp-fail2ban plugin 5.4.1 (integrity-verified against the pinned WordPress.org checksum manifest, auto-update disabled) plus a WPFY-owned MU-plugin bridge that writes structured auth-failure records to `<site>/security/wp-auth.log`; per-site jail `wpfy-<sha256[:16]>` policy maxretry 5 / findtime 10m / bantime 1h.
+- Ban scope: a ban blocks TCP 80/443 through Docker's `DOCKER-USER` chain, server-wide. Exact disclosure: "Only enabled sites can trigger Login Shield bans. A resulting HTTP ban may block the attacker from all websites on this WPFY server." SSH (port 22) is never a ban target, and recovery through root key login always works. The ban covers forwarded/foreign traffic only; traffic that originates host-locally, through docker-proxy userland, or from a compromised container is not blocked by the ban rule.
+- Installation: `wpfy stack install --nginx`, `--all`, or `--fail2ban` installs and manages the host fail2ban package idempotently (Branch C) with WPFY-owned filter/jail/action files, validation before service start, and rollback; the panel jail activates with the install and per-site jails activate at site enable.
+- Trusted proxy: forwarded client IPs are trusted only from exact Traefik `/32` and `/128` container addresses with a 30-second monotonic TTL (discovery failures never cached); never a shared Docker subnet. Never-ban identities (loopback, Docker bridge, Cloudflare ranges when configured, Traefik edges, panel backend) are redacted to the `0.0.0.0` sentinel at resolution and again at emission; Fail2ban `ignoreip` stays loopback-only.
+- Cloudflare: proxied sites trust Cloudflare ranges as an additional hop in site nginx; Cloudflare edge addresses are never bannable.
+- IPv4/IPv6: IPv4 enforcement is active where Docker publishes 80/443. IPv6 bans are gated on real capability: status reports `ipv6_protection: inactive` with `health: degraded` until an IPv6-capable action is rendered (stale-action detection), so there is no silent unprotected public IPv6.
+- Log paths: panel `/var/log/wpfy/panel-auth.log` (0600, `O_NOFOLLOW`, in-process copytruncate rotation 10 MB x 3); per-site `<site>/security/wp-auth.log` (0640, logrotate `maxsize 100M` / rotate 12 / compress / copytruncate); Fail2ban service log and bounded sqlite database. Blocked requests write 0 bytes.
+- Log rotation uses `copytruncate` because every monitored file is bind-mounted as a single file and must keep its inode.
+- Plugin ownership: `wpfy-installed` and `activated-by-wpfy` plugins are deactivated on disable and never uninstalled; `admin-installed` and `already-active` plugins are preserved with admin auto-update policy intact.
+- Enable/disable lifecycle: idempotent; enable runs install -> bridge -> activate -> jail render -> validate -> reload with a fixture pipeline proof and full rollback on any failure; disable removes only this site's jail and bridge guard and preserves logs and the host Fail2ban install.
+- Upgrade behavior: the plugin is pinned to 5.4.1 with per-file checksum verification (array-tolerant for repack manifests); auto-updates are disabled for WPFY-managed installs; any upgrade re-verifies.
+- Performance (measured 2026-08-06, 2-CPU dev host, N>=24 per metric): no meaningful additional work on ordinary frontend requests; an enabled site shows ~10% plugin-bootstrap cost (+0.0107 s mean), a disabled site writes 0 B; a failed login appends ~230-253 B; blocked traffic costs zero server work; fail2ban RSS stays 38-42 MB flat; time from threshold to active ban ~1 s.
+- Known limitation: under a sustained blocked burst, the kernel ICMP reply rate limit on `icmp-port-unreachable` produces ~1 s median client-side latency; `--reject-with tcp-reset` is the recommended future improvement.
+
 ## Hardening
-- Planned: fail2ban/security hardening after core site lifecycle.
+- Implemented: Login Shield (host Fail2ban + per-site opt-in WordPress protection), see above.
 - Planned: explicit non-root users and read-only root filesystems where compatible with the PHP, Nginx, DB, Redis, WP-CLI, Traefik, and SFTP images.
 
 ## Supply Chain

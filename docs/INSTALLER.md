@@ -10,6 +10,7 @@ curl -fsSL https://raw.githubusercontent.com/wpfyorg/wpfy/main/install.sh | sudo
 - Installer script exists at repo root as `wpfy`.
 - `install.sh` downloads the public GitHub source archive for `WPFY_REF` (default `main`) and runs the bundled `wpfy` installer with `--skip-wpfy-install`.
 - `install.sh` verifies the source archive when `WPFY_SOURCE_SHA256` is set.
+- Stack install with `--nginx`, `--all`, or `--fail2ban` ensures host-level fail2ban idempotently (Branch C): installs the package when absent, lands WPFY-owned filter/jail/action files before service start, validates, starts and reloads the service, and rolls back on failure. WPFY never modifies `/etc/fail2ban/jail.conf` or administrator-owned jails; the panel login jail activates with the install and per-site jails activate at site enable. See amended ADR 0023.
 - The script bootstraps Ubuntu, creates adaptive swap when useful on small VPS hosts, installs base packages, installs or verifies Docker and the Compose plugin, creates core directories, syncs the source tree, installs `wpfy` into `/opt/wpfy/venv`, writes a `/usr/local/bin/wpfy` wrapper, writes `/etc/wpfy/wpfy.conf`, and runs smoke checks.
 - Source updates are staged in `/opt/wpfy/app.next`, activated as `/opt/wpfy/app`, and rolled back from `/opt/wpfy/app.previous` if a later install step fails.
 - Both scripts support `--dry-run` for non-destructive verification; `wpfy` also supports `WPFY_DRY_RUN=1`.

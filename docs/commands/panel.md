@@ -2,6 +2,16 @@
 
 The loopback-only panel exposes site operations through an authenticated JSON API. Start it on the server and use an SSH tunnel for remote browser access; the panel does not bind to a public interface.
 
+Each accepted panel connection has a 30-second idle socket timeout. A client that stalls while sending its request line or headers is disconnected before authentication can run; a legitimately slow client that pauses longer than 30 seconds must reconnect. Intentional HTTP/1.1 keep-alive is unaffected when the next request arrives within the idle timeout.
+
+## Site field vocabularies
+
+Site create/config requests accept PHP `php_version` values `7.4`, `8.0`,
+`8.1`, `8.2`, `8.3`, or `8.4`; Let's Encrypt `letsencrypt` values `default`,
+`wildcard`, or `off`; and `dns_provider` value `cloudflare`. The panel rejects
+unknown values before it creates a job, and the shared site lifecycle validates
+them again before preflight, rendering, or persistence.
+
 ## Token input
 
 ```text
@@ -9,7 +19,7 @@ wpfy panel --token-file <path>
 WPFY_PANEL_TOKEN=<token> wpfy panel
 ```
 
-The panel accepts the bearer token through `--token-file` or `WPFY_PANEL_TOKEN`. The file form keeps the token out of the process table. The legacy `--token` option remains accepted for compatibility but now emits a warning because command-line arguments are visible in the process table.
+The panel accepts the bearer token through `--token-file` or `WPFY_PANEL_TOKEN`. The file form keeps the token out of the process table. Raw `--token` values are refused because command-line arguments are visible in the process table.
 
 ## First-run setup
 
@@ -95,9 +105,9 @@ GET /api/sites/<domain>/security
 PUT /api/sites/<domain>/security
 ```
 
-`GET /security` returns the deny list, user-agent blocks, basic-auth enabled state and username, Cloudflare-only state, generated snippet path, and the resolved trusted edge sources. It never returns a password or hash.
+`GET /security` returns the deny list, user-agent blocks, basic-auth enabled state and username, Cloudflare-only state, generated snippet path, the resolved trusted edge sources, and the Login Shield state (`fail2ban`, `login_shield`, `protected_surfaces`). It never returns a password or hash.
 
-`PUT /security` accepts `deny_ips`, `ua_blocks`, `basic_auth`, and `cloudflare_only`. A request may also carry `dry_run` and `acknowledge_warnings`. Unknown fields are rejected, and all values pass through the accepted per-site security operation layer.
+`PUT /security` accepts `deny_ips`, `ua_blocks`, `basic_auth`, `cloudflare_only`, `login_rate_limit`, and `fail2ban`. A request may also carry `dry_run` and `acknowledge_warnings`. Unknown fields are rejected, and all values pass through the accepted per-site security operation layer.
 
 A dry run validates the complete desired state, runs `security_preflight`, and returns `changes`, planned `operations`, and `warnings` without calling a mutator. It therefore does not write `security.json`, the Nginx snippet, `nginx/htpasswd`, or Compose output.
 
@@ -110,6 +120,19 @@ When basic auth is enabled without a supplied password, the apply response inclu
 ```
 
 The panel displays it in the existing one-time credential panel. Later reads expose only `{enabled, username}`, and the site stores only the `{SHA}` htpasswd value.
+
+A successful apply response means the requested protection is active at the running edge, or explicitly staged when the site's `web` service is stopped. Snippet controls reload Nginx only when `web` is running; a stopped site reports that the configuration will apply when it starts. Cloudflare-only compares rendered labels with the running container and force-recreates `web` only when labels are stale or unreadable, so an already-applied state is not re-applied on an unchanged save. If application fails, the response is non-success and explains that configuration was staged but not applied. Repeating the same request retries the operation, including when the desired state was already persisted by a prior failed request. Runtime-skipped and unavailable-Docker operation remains offline-safe.
+
+### Login Shield (Security tab)
+
+The Security tab renders a Login Shield section with the header "Protect WordPress authentication using WP fail2ban and the server's Fail2ban service." It shows an enable checkbox, a status block, the protected surfaces (`wp_login, xmlrpc, rest, password_reset, user_enum, app_password`), and two static notes:
+
+- "Only enabled sites can trigger Login Shield bans. A resulting HTTP ban may block the attacker from all websites on this WPFY server."
+- "The panel's own fail2ban jail is host-managed and cannot be disabled here."
+
+The `login_shield` status object carries `enabled`, plugin `{slug, version, ownership, auto_updates_disabled, active}`, host fail2ban installed/health, `jail_name`, `jail_active`, `event_log_path`, `event_log_health`, `last_detected_failure`, `recent_matched_failures`, `recent_bans`, `total_bans`, `ban_scope`, `trusted_proxy_health`, `ipv4_protection`, `ipv6_protection`, `config_validation`, `wpfy_chain_attached`, `action_stale`, `degraded_reason`, and `health`. Status is always read live, never from the preview.
+
+The checkbox is dirty-tracked: only an actual change sends `PUT /security {"fail2ban": true|false}`. The panel route calls the same `set_fail2ban` operation layer as the CLI (host ensure, plugin install/deactivate, bridge guard, jail render, validate/reload, fixture proof, rollback); no business logic is duplicated in the panel. Preview change text is `enable WordPress fail2ban login shield` / `disable WordPress fail2ban login shield`; an unchanged toggle is a no-op. A degraded health (`health: degraded` plus `degraded_reason`, for example a stale Docker action or an out-of-band plugin deactivation) renders as a warn row while every other row stays visible. The payload never exposes the auth log, account hashes, client IPs, or any credential; only the last-detected-failure UTC timestamp surfaces.
 
 ## Cron endpoints
 
@@ -146,11 +169,3 @@ The Events view filters by exact domain and action and keeps `job_id` visible fo
 The Services view reports the shared `wpfy-traefik` edge and the services derived for every managed site. A per-site restart accepts only the existing `site_cron` service allowlist for that site (`web`, `app`, and conditional `db`, `redis`, `sftp`, or `adminer`). Validation happens before the service reaches the Compose argument vector, so flag-shaped names, cross-site names, unavailable services, and `wpfy-traefik` are refused without running a restart.
 
 The shared edge has a separate destructive route. It requires the exact JSON body `{"confirm":"wpfy-traefik"}`. The browser states that restarting the edge affects every site and enables the action only after the same typed confirmation.
-
-## Site field vocabularies
-
-Site create/config requests accept PHP `php_version` values `7.4`, `8.0`,
-`8.1`, `8.2`, `8.3`, or `8.4`; Let's Encrypt `letsencrypt` values `default`,
-`wildcard`, or `off`; and `dns_provider` value `cloudflare`. The panel rejects
-unknown values before it creates a job, and the shared site lifecycle validates
-them again before preflight, rendering, or persistence.

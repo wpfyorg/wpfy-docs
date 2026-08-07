@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-28
+- Amended: 2026-08-07 (WPFY Login Shield; see Amendment below)
 - Extends: ADR 0016 per-site security controls; ADR 0022 login rate limiting
 
 ## Context
@@ -45,3 +46,32 @@ Nginx refuses only `/wp-admin/install.php`, `/wp-admin/upgrade.php`, and the kno
 - Existing sites need `wpfy refresh <domain>` once to recreate their Compose service with the new access-log bind mount. Enabling or disabling fail2ban already performs that re-render.
 - Operators must install and run the host `fail2ban` package before enabling the feature. They should validate a production deployment with `fail2ban-client status` and the generated jail name after making failed test requests.
 - The offline suite proves filter/log agreement, path isolation, state validation, action chain selection, access-log permissions, and inode preservation. It cannot prove that a production host's Docker, Nginx, fail2ban, and iptables versions accept and enforce the generated configuration; that requires real-host validation.
+
+## Amendment 2026-08-07: WPFY Login Shield (Branch C, Docker action, panel jail, wp-fail2ban bridge)
+
+Supersedes the 2026-07-28 text where the two conflict; the original decision remains accurate for the access-log and filter baseline.
+
+### Branch C host install (idempotent, not refuse)
+
+`wpfy site security <domain> fail2ban on` no longer refuses when `fail2ban-client` is absent; it calls `ensure_fail2ban_host()` (Branch C) and the same path backs `wpfy stack install --nginx`, `--all`, and `--fail2ban`. Order: apt install (lock timeout) when absent -> land WPFY-owned configs before service start -> in-process failure-id and jail-logpath validation -> `fail2ban-client -t` -> `systemctl enable --now` -> ping -> reload. Fresh-install failure rolls the package back; an existing install restores the previous WPFY-owned files and restarts the service so protection is never silently off. `/etc/fail2ban/jail.conf` and non-WPFY jails are never modified; distro jails such as `sshd` are reported, never edited. Enabling a site with a skipped/unhealthy host ensure still refuses cleanly with no partial state.
+
+### WPFY-owned Docker action replaces stock iptables-multiport
+
+Generated jails use `action = wpfy-docker-http[name=<jail>]` referencing `action.d/wpfy-docker-http.conf`, a WPFY-rendered action with one unique `f2b-wpfy-<name>` chain per jail (validated <= 28 chars). It attaches to `DOCKER-USER` with check-before-insert, bans with `REJECT --reject-with icmp-port-unreachable` on TCP 80/443 only, never touches `INPUT` or port 22, and removes only its own rules and empty chains. All commands use `iptables -w` / `ip6tables -w` (nft backend compatible). IPv6 is rendered only when the host is IPv6-capable; a rendered action embeds a marker, and `enforcement_status` reports `health: degraded` (`action stale`) until an IPv6-capable action is re-rendered, so there is no silent unprotected public IPv6.
+
+### Panel authentication log and jail (the panel's own protection layer)
+
+Panel auth failures append a strict six-key JSONL record to `/var/log/wpfy/panel-auth.log` (mode 0600, `O_NOFOLLOW`, in-process copytruncate rotation 10 MB x 3). Filter `wpfy-panel-auth` matches exactly `event=panel_auth_failure` with a real (non-`0.0.0.0`) client IP. Jail `wpfy-panel-auth` activates with the host install: maxretry 8 / findtime 10m / bantime 15m, `ignoreip 127.0.0.0/8 ::1`, action chain `f2b-wpfy-panel-auth`. The panel's in-memory throttling (Layer 1) remains active independently of fail2ban. Never-ban identities (loopback, Docker bridge, Cloudflare ranges when configured, Traefik edge addresses, panel backend) are redacted to the `0.0.0.0` sentinel at resolution and at emission; the sentinel is rejected by the filter, so edge identities can never be banned at the filter layer either.
+
+### Per-site jail single logpath + wp-fail2ban bridge
+
+Each enabled site's jail renders exactly one `logpath` = `<site>/security/wp-auth.log`. Two `logpath` keys (or a line-continuation that becomes `addlogpath p1 p2`) are rejected by fail2ban 1.0 at reload while `fail2ban-client -t` passes, so an in-process `validate_jail_logpath` guard runs before any write. The coarse nginx access-log backstop regex stays in the shared filter but is inert for per-site jails because they no longer tail the access log; the strict WordPress event path is authoritative. WordPress protection uses the official wp-fail2ban plugin 5.4.1 (pinned; per-file checksums verified, including array-shaped manifests; auto-update disabled) and a WPFY-owned MU-plugin bridge hooking the plugin's `Syslog::write` filter (4-argument contract: `$value, $level, $msg, $remote_addr`) and WordPress core `application_password_failed_authentication`. The bridge writes one JSONL record per failure (surface, `client_ip`, `account_hash`, `reason_class`), returns `true` to skip native syslog (unreachable from the Alpine PHP image), uses `REMOTE_ADDR` only (never forwarded headers), and is never fatal. Plugin ownership is recorded in `security.json`; disable deactivates only WPFY-owned activation and never uninstalls admin-installed plugins.
+
+### fail2ban 1.0 failure-id groups (validated in-process)
+
+fail2ban >= 1.0 requires a failure-id group (`fid`/`ip4`/`ip6`/`dns`) in every failregex; the legacy `(?P<host>...)` raises `RegexException` at jail start while `fail2ban-client -t` passes. WPFY strict JSONL filters use non-capturing `(?:(?P<ip4>...)|(?P<ip6>...))` groups, keep the `(?!0\.0\.0\.0")` never-ban guard, and are validated in-process before any `-t`; CI additionally runs the real `fail2ban-regex` binary against fixture logs. `host` groups are absent from strict filters (fail2ban 1.0 would not extract a ban IP from them).
+
+## Amendment consequences
+
+- `wpfy stack install --nginx|--all|--fail2ban` now manages host fail2ban; `wpfy security fail2ban status|repair|test|unban <ip>` and `wpfy site security <domain> fail2ban on|off|status|reset` are the operator surfaces. Bans are server-wide HTTP and disclosed verbatim.
+- Live-verified 2026-08-06/07 on the dev host: 16/16 checks PASS (panel and per-site jail chains, real bans on `DOCKER-USER`, SSH untouched, unban restores, trusted-proxy spoofing fails safely, container recreation and fail2ban restart preserve enforcement), plus a rollback drill and measured performance.

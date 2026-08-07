@@ -86,9 +86,7 @@ provider firewall policy stays yours, deliberately — a tool that silently edit
 firewall rules can lock you out of your own machine, and wpfy has no way to know
 what else the host is serving.
 
-The one exception is scoped and explicit: if you enable per-site fail2ban, the
-jail's own action inserts and removes ban rules in Docker's `DOCKER-USER` chain
-while it is running. That is fail2ban acting, on a jail you turned on by name.
+The one exception is scoped and explicit: Login Shield's fail2ban jails — the host-managed panel jail (`wpfy-panel-auth`, activated by `wpfy stack install`) and any per-site jail you enable — insert and remove ban rules in Docker's `DOCKER-USER` chain while running. That is fail2ban acting, on jails WPFY installed for Login Shield. See `runbooks/login-shield.md`.
 
 ## Recovery
 

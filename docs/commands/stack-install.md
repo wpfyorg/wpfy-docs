@@ -10,6 +10,7 @@ Bootstrap or verify runtime stack components.
 - Implemented: `--php`, `--mysql`/`--mariadb`, `--redis`, and `--wpcli` pull the required Docker images.
 - Implemented: `--php` with no version pulls the default PHP 8.4 image; explicit version pulls support `7.4`, `8.0`, `8.1`, `8.2`, and `8.3`.
 - Implemented: `--all` selects the Docker-backed v1 components and pulls only the default PHP image.
+- Implemented: `--fail2ban` installs and verifies the host fail2ban package and service idempotently (Branch C); `--nginx` and `--all` also ensure host fail2ban because the panel login jail is part of the runtime stack. WPFY-owned filters, jails, and the Docker `DOCKER-USER` action are installed before service start; `/etc/fail2ban/jail.conf` and administrator-owned jails are never modified. See amended ADR 0023.
 - Implemented: `--phpmyadmin`, `--adminer`, and `--composer` pull pinned-major helper images for opt-in preparation.
 - Implemented: non-Docker host tools are reported as not applicable; `--mysqltuner` skips until a vetted pinned image exists.
 - Implemented: phase banners and per-component summary lines make long installs readable without exposing raw Docker pull chatter.
@@ -21,6 +22,7 @@ wpfy stack install --nginx
 wpfy stack install --all
 wpfy stack install --php
 wpfy stack install --php 8.3
+wpfy stack install --fail2ban
 wpfy stack install --phpmyadmin --adminer --composer
 ```
 
