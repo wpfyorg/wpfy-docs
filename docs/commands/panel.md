@@ -21,6 +21,21 @@ WPFY_PANEL_TOKEN=<token> wpfy panel
 
 The panel accepts the bearer token through `--token-file` or `WPFY_PANEL_TOKEN`. The file form keeps the token out of the process table. Raw `--token` values are refused because command-line arguments are visible in the process table.
 
+## Panel exposure
+
+The panel stays loopback-only by default; external access is opt-in through the Traefik edge (ADR 0021, ADR 0032). Command surface:
+
+```text
+wpfy panel expose --domain <host> --confirm <exact host> [--alias <host> ...] [--port N]
+wpfy panel expose --status
+wpfy panel expose --disable
+wpfy panel service install|remove
+```
+
+Exposure is refused unless named-user login is required, at least one TOTP-enabled user exists, the typed `--confirm` matches the canonical host plus every sorted alias verbatim, and the DNS/IP preflight passes for the domain and every alias. A valid non-local ACME contact on every resolver plus the `le-http` HTTP-01 resolver on entryPoint `web` is a prerequisite enforced by the same preflight that protects site SSL; `wpfy stack acme-email` shows and sets it. The canonical host is the only host that serves the panel; `--alias` hostnames receive SAN coverage and redirect permanently to the canonical host. The HTTP-to-HTTPS redirect router is pinned to `service: noop@internal` (Traefik v3 rejects a service-less router); that fix requires deployment and is not live until a release containing it is deployed.
+
+The panel believes `X-Forwarded-Proto`/`X-Forwarded-Host` for same-origin checks and `X-Forwarded-For` for failed-login throttle keying only when the direct peer belongs to the discovered `wpfy-panel-edge` network, walking the chain right-to-left past trusted hops (ADR 0028); direct and loopback callers cannot spoof their throttle identity. `wpfy panel expose --disable` removes the router file (written atomically) and the installed service — the complete rollback path. IPv6 external exposure is not verified; no live host with global IPv6 has validated the exposed panel.
+
 ## First-run setup
 
 On an install with no panel users, `wpfy panel` prints a URL containing a run-token fragment. The browser uses that token to call:

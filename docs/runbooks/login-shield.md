@@ -1,7 +1,7 @@
 # Runbook: WPFY Login Shield — operate, unban, repair, roll back
 
 ## Status
-- Implemented. Live-verified end to end 2026-08-06/07 (16/16 checks PASS, real ban, rollback drill).
+- Implemented. Live-verified end to end 2026-08-06/07 (16/16 checks PASS, real ban, rollback drill) and re-verified 2026-08-09/10 in the release rehearsal against the exact planned artifact (per-site ban on `DOCKER-USER`, untouched second site, SSH untouched, unban restores; evidence `.omo/evidence/wpfy-fix-plan/task-15/`).
 
 ## Goal
 Operate WPFY Login Shield: inspect status, unban an IP, repair a degraded service, and recover from a bad configuration or an unintended ban.

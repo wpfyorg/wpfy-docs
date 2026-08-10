@@ -2,7 +2,14 @@
 
 ## Unreleased
 
-### Password argv hardening (2026-08-05)
+### Docs reconciliation and panel exposure recovery (2026-08-10)
+- Added ADR 0032 recording the panel exposure contract: loopback default with SSH tunnelling recommended, opt-in `wpfy panel expose` gated on exact typed confirmation + named-user login + TOTP + DNS/IP preflight, a valid ACME contact on every resolver plus the `le-http` resolver as a hard prerequisite, a canonical host with aliases redirecting to it, the trust boundary (forwarded identity believed only from a `wpfy-panel-edge` peer), and atomic rollback via `wpfy panel expose --disable`.
+- Amended ADR 0031: `WPFY_FM_LEGACY_API` now defaults off; the legacy file-manager API returns 404 unless explicitly enabled. The File Manager proxy Host-header fix (D6) requires deployment.
+- Amended ADR 0023 with post-implementation gate truth: the release rehearsal re-verified Login Shield end to end; phase 7e gates B5/B6 remain red because they assert the pre-amendment design (documented stale probes, not security regressions).
+- Marked ADR 0022's panel throttle key superseded in part by ADR 0028.
+- Runbooks/commands now state the ACME prerequisite for exposure and that the HTTP→HTTPS redirect fix (D1, `noop@internal`) requires deployment — it is not live until deployed. IPv6 external exposure remains not verified.
+
+## Password argv hardening (2026-08-05)
 - **Breaking:** `wpfy site create --pass` and grouped `wpfy site update --password`
   now reject raw password values. Use `-` for one stdin line or `prompt` from a
   TTY; this keeps WordPress administrator passwords out of process argv.

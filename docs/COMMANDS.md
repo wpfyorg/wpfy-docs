@@ -33,6 +33,8 @@
 - `wpfy dns cloudflare set|status|test|clear`
 - `wpfy security fail2ban status|repair|test|unban <ip>` (host Login Shield)
 - `wpfy site security <domain> fail2ban on|off|status|reset` (per-site Login Shield)
+- `wpfy panel expose --domain <host> --confirm <exact host> [--alias ...]`, `wpfy panel expose --status|--disable`, `wpfy panel service install|remove` (opt-in external panel exposure; loopback/SSH tunnel remains the default)
+- `wpfy stack acme-email [address]` (ACME contact; required for SSL and panel exposure preflight)
 - `wpfy site restore <domain> [<backup>|--list|--latest]`
 - `wpfy restore <domain> [<backup>|--list|--latest]`
 - `wpfy backup prune <domain|all> --keep N [--dry-run]`

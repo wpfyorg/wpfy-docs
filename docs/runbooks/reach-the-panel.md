@@ -47,36 +47,59 @@ access.
    ```
    Exposure is refused until a factor exists. This is not advisory — the command stops. Account creation is also refused if an unconfigured panel is started in edge-service mode; return to the tunnel.
 2. Point a DNS A/AAAA record for the panel domain at the VPS.
-3. Configure the exposure router. The domain must be typed twice — `--confirm`
-   has to match `--domain` exactly:
+3. **Make sure a valid ACME contact is configured.** The exposure preflight fails until every ACME resolver in the Traefik static config carries one identical valid non-local contact email and the `le-http` HTTP-01 resolver exists on entryPoint `web`. Check and set it with:
+   ```
+   wpfy stack acme-email          # shows the effective address
+   wpfy stack acme-email you@example.com   # configure when unset/invalid
+   ```
+   The live release rehearsal canonicalized `panel.wpfydev.top` with the contact `arnab@wpfy.org` on the staging host; on your host use your own contact. Configured addresses survive later renders (ADR 0027).
+4. Configure the exposure router. The domain must be typed twice — `--confirm`
+   has to match `--domain` exactly (aliases, if any, are appended to the typed
+   string):
    ```
    wpfy panel expose --domain panel.example.com --confirm panel.example.com
    ```
    This runs the same DNS/IP preflight as site SSL and never skips it. It writes
    a Traefik file-provider router with TLS and a rate-limit middleware, on a
-   dedicated `wpfy-panel-edge` network. The command reports router configuration,
-   not public readiness.
-4. **Install the panel service. This step is mandatory; the router returns 502
+   dedicated `wpfy-panel-edge` network. The canonical host is the only host that
+   serves the panel; explicit `--alias` hostnames get SAN coverage on the same
+   certificate and redirect permanently to the canonical host. The command
+   reports router configuration, not public readiness.
+5. **Install the panel service. This step is mandatory; the router returns 502
    without its backend:**
    ```
    wpfy panel service install
    ```
-5. Check that both pieces are configured:
+6. Check that both pieces are configured:
    ```
    wpfy panel expose --status
    ```
    The router must be `configured` and the service must be `installed` before
    the public URL is expected to work.
-6. Reverse it at any time:
+7. Reverse it at any time:
    ```
    wpfy panel expose --disable
    ```
-   Idempotent — safe to run when nothing is exposed.
+   Idempotent — safe to run when nothing is exposed. It removes the router file
+   (written atomically) and the installed service, so it is the complete
+   rollback path.
 
 > `wpfy panel expose --status` reports the generated router, recognised domain,
 > and whether the required panel service is installed. It is local configuration
 > state, not a public network probe; verify the HTTPS URL after both pieces are
 > configured. `expose --disable` remains the idempotent way to remove exposure.
+
+### Release-status note (external redirect)
+
+The HTTP→HTTPS redirect router is pinned to `service: noop@internal` (Traefik
+v3 rejects a service-less router). That fix, plus the File Manager proxy
+Host-header fix, was shipped in the post-rehearsal hotfix but **requires
+deployment** — it is not live until a release containing it is deployed. Until
+then an external HTTP request to the panel host may return `404` on port 80
+(release rehearsal finding D1). Always verify the public URL after deploying
+the fix. IPv6 external exposure is **not verified** — no live host with global
+IPv6 has validated the exposed panel; do not report it as working without that
+evidence.
 
 ## Firewalls
 

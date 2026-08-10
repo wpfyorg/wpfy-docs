@@ -73,10 +73,27 @@ X-Forwarded-User`) with the panel as the ONLY ingress. Deployment shape
 ## Consequences
 
 - `WPFY_FM_ENABLED` defaults to off (`0`) until the feature is promoted.
-- `WPFY_FM_LEGACY_API` defaults to on (`1`) as the rollback path.
+- `WPFY_FM_LEGACY_API` defaults to **off (`0`)** as amended 2026-08-10: the
+  legacy file-manager API returns HTTP 404 "file manager legacy api disabled"
+  unless `WPFY_FM_LEGACY_API=1` is explicitly set. The F-FILES-PROTECT fix
+  flipped this default after the original text was written, and the Todo 15
+  rehearsal verified the 404 live. Setting `1` explicitly remains the rollback
+  path for a site that needs the legacy surface.
 - Upgrades go through the plan's section 20 compatibility lane.
 - Rollback is the previous release plus the legacy API; the Quantum container
   is never reachable without the panel proxy.
 - Release artifacts for the chosen image live in `deploy/file-manager/`
   (`image.lock`, `compose.fragment.yaml`, `config.template.yaml`, `SBOM.txt`,
   `LICENSE.txt`, `SECURITY.md`, `config.generated.yaml`).
+
+## Amendment 2026-08-10: post-implementation proxy truth
+
+The Todo 15 release rehearsal enabled File Manager live (digest matches
+`image.lock`, container isolation verified, lifecycle and protected-file flows
+pass), but the proxy path for GET/PUT/PATCH/upload was blocked end-to-end
+because the proxy forwarded upstream without an HTTP `Host` header and real
+Quantum (Go `net/http`) rejects such requests (live finding D6). The
+post-rehearsal hotfix sends an explicit `Host` header in the proxy request;
+that fix **requires deployment** and is not yet live. Until then,
+proxy-mediated file operations must not be described as working on a deployed
+host, even though the container and its isolation are proven.

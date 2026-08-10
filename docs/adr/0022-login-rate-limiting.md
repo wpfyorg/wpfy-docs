@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-28
+- Superseded in part: 2026-08-01 (ADR 0028) for the panel throttle key; see below
 - Extends: ADR 0016 per-site security controls; ADR 0020 panel authentication
 
 ## Context
@@ -21,6 +22,16 @@ That exact location repeats the PHP FastCGI directives, including `fastcgi_param
 The zone file uses `$binary_remote_addr`, a 1 MiB bounded zone per site, `1r/s`, `burst=5 nodelay`, and a five-connection cap. It is individually bind-mounted, so changes use an inode-preserving no-follow in-place write rather than `os.replace`. Enabling or disabling re-renders the site's Compose file so pre-existing sites gain the mount.
 
 The server snippet emits `set_real_ip_from` for every discovered Traefik CIDR whenever either IP denial or login rate limiting needs real-client resolution, plus `real_ip_header X-Forwarded-For` and recursive resolution. CIDR discovery failure installs fail-closed rules rather than guessing a proxy source. A future operator-IP exception is noted but deliberately deferred.
+
+## Superseded in part: 2026-08-01 — panel throttle key follows the trusted edge (ADR 0028)
+
+The sentence in the Decision that the panel throttle "does not use forwarding
+headers for this key" is superseded for the exposed-panel path. ADR 0028
+records that the panel now keys failed-login throttling on a forwarded client
+address when — and only when — the direct socket peer belongs to the discovered
+`wpfy-panel-edge` network, walking the forwarded chain right-to-left past
+trusted hops. The Nginx-side `$binary_remote_addr` decision in this ADR is
+unchanged; the panel-side cooldown key is what ADR 0028 refines.
 
 ## Alternatives considered
 
