@@ -1,5 +1,27 @@
 # Decision Log
 
+## 2026-08-15: Publish the panel without a domain, over self-signed TLS
+- Decision: `wpfy panel expose --no-domain` binds the panel on the host's public
+  address over a self-signed certificate and prints its SHA-256 fingerprint next
+  to the URL. First-run account creation over that address requires a one-time
+  secret, printed only by that command, hashed at rest, expiring after an hour,
+  and carried in the URL fragment. Basic auth is available in front of the
+  exposed Traefik router only. Recorded as ADR 0033.
+- Reason: Operators without a DNS name had no supported way to reach the panel
+  except an SSH tunnel. Taken literally the request -- a bare IP on port 3939
+  with a secret link -- would send the first-run password, the TOTP secret, the
+  session token and the gating secret itself across the internet in the clear,
+  because no CA issues certificates for a bare address.
+- Alternatives considered: plaintext with a loud warning (the credentials still
+  cross unencrypted); allow login but never account creation over the edge
+  (does not deliver the request, and login is equally exposed without TLS);
+  refusing the mode entirely (leaves the operator with no path at all).
+- Consequence: This relaxes a deliberate loopback-only decision. The secret's
+  properties are what make it acceptable and none is optional. `openssl` becomes
+  a hard requirement for this mode. Still unvalidated on a real host: public
+  address detection, firewall interaction on 3939, and the Traefik middleware
+  reload need a validation-VPS pass.
+
 ## 2026-08-15: Rebuild the panel client on Tabler, and make every long operation a job
 - Decision: Replace the panel client rather than reskin it. Vendor Tabler 1.4.0
   (CSS + JS) flat in `panel_static/`, collapse site detail from fourteen tabs to
