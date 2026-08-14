@@ -5,6 +5,25 @@
 - Target install UX: `curl -fsSL https://raw.githubusercontent.com/wpfyorg/wpfy/main/install.sh | sudo bash`.
 
 ## Implemented
+- Panel rebuild on Tabler (2026-08-15, ADR 0032): the loopback panel client is
+  rebuilt from scratch on vendored Tabler 1.4.0. Site detail is five tabs
+  (Overview, Settings, Data, Access, Automation) with the old fourteen paths
+  redirecting for one release; the site-creation wizard reads back what it
+  collects and sends only the eleven fields the server accepts; all ten admin
+  pages ship; running operations live in a header popover, not a page, with an
+  indeterminate bar because jobs report steps and never a total. `panel_jobs`
+  is still an in-memory dict, so a panel restart loses in-flight jobs -- the
+  client says so rather than spinning.
+- Host port management (2026-08-15): `firewall_ports.py` wraps `ufw` behind
+  `/api/firewall/ports|enable|disable`. `enable()` allows the SSH port read from
+  `sshd_config` before the firewall comes up; deny and delete refuse that port
+  unless the request carries it as a typed confirmation. wpfy never installs
+  `ufw`. **Not yet validated on a real host** -- the offline suite stubs
+  `subprocess.run`, so this needs a validation-VPS pass.
+- Write-only secrets keep their stored value when the field is blank
+  (2026-08-15): `PUT /api/backup/remote` and `PUT /api/notifications/smtp`.
+- Password minimum enforced in `panel_auth._validate_password` (2026-08-15), so
+  every write path gets it rather than only first-run setup.
 - Site field vocabulary validation (2026-08-05): lifecycle create/update
   validates PHP image, Let's Encrypt mode, and DNS provider values before
   preflight or scaffold writes, including persisted site state.

@@ -1,5 +1,57 @@
 # Decision Log
 
+## 2026-08-15: Rebuild the panel client on Tabler, and make every long operation a job
+- Decision: Replace the panel client rather than reskin it. Vendor Tabler 1.4.0
+  (CSS + JS) flat in `panel_static/`, collapse site detail from fourteen tabs to
+  five, convert every long operation to a `202 {job_id}` job, add one SSE stream
+  in place of three pollers, and add host port management (`firewall_ports.py`)
+  over `ufw`. Recorded as ADR 0032.
+- Reason: Two audits found the client broken, not untidy. The seven-step wizard
+  never read steps 2-6 and shipped defaults regardless of what was typed; six
+  destructive actions fired with no confirmation; six `refresh*` functions had
+  no post-`await` domain guard, so switching site mid-flight could write site
+  A's values to site B. A component library on top of that logic would only have
+  made it better looking.
+- Alternatives considered: reskin the existing client (preserves the defects);
+  a CDN or build step for Tabler (the panel CSP is `default-src 'self'`, a wpfy
+  box may have no outbound HTTPS, and `package-data` is non-recursive so a
+  `vendor/` directory vanishes from the wheel); keeping fourteen tabs (five of
+  them were the same refresh/preview/apply job repeated).
+- Consequence: Old tab paths redirect for one release. `panel_jobs` remains an
+  in-memory dict, so a panel restart still loses in-flight jobs -- the client now
+  reports that honestly instead of spinning forever. Three gates hold the line:
+  every shipped `.js` must parse, every module issuing a destructive request must
+  load the confirmation helper, and the riskiest four must use a typed keyword.
+
+## 2026-08-15: Write-only secrets keep their stored value on a blank field
+- Decision: `PUT /api/backup/remote` and `PUT /api/notifications/smtp` accept a
+  request with the secret omitted or empty, meaning "keep the stored one". Only
+  a non-empty value replaces it. The first write still requires one.
+- Reason: Both endpoints demanded the secret on every write while no read path
+  returns it, so changing a bucket prefix forced the operator to re-type an S3
+  secret key, and a client sending `""` to satisfy a required field silently
+  overwrote a working credential with an empty one. Nothing failed until the
+  next scheduled upload, at night, quietly.
+- Alternatives considered: require the secret on every edit (an operator who has
+  lost the original can never change the prefix again); delete-and-recreate only
+  (leaves a window with no destination during which a scheduled backup fails).
+- Consequence: The write-only property is unchanged -- no read path returns a
+  secret, and the panel never round-trips one. No ADR: this narrows a request
+  contract, it does not change ownership or architecture.
+
+## 2026-08-15: Enforce the password minimum in one validator
+- Decision: Move the 12-character floor into `panel_auth._validate_password`,
+  which `add_user`, `update_user`, `set_password` and first-run setup all call.
+  `panel_setup.PASSWORD_MIN_LENGTH` becomes a re-export.
+- Reason: The floor was enforced only by the first-run setup form. The admin who
+  was made to pick twelve characters could then create a site-manager with a
+  one-character password, on a panel `wpfy panel expose` can publish to the
+  internet.
+- Alternatives considered: client-side only (a direct API call or the CLI
+  bypasses it, so the guarantee is cosmetic).
+- Consequence: Stored passwords are unaffected -- validation runs on write, so
+  existing accounts keep working until someone changes them.
+
 ## 2026-08-05: Validate site field vocabularies at lifecycle entry
 - Decision: Define one vocabulary for PHP versions, Let's Encrypt modes, and
   DNS providers; validate create/update requests at the shared lifecycle before

@@ -169,3 +169,111 @@ The Events view filters by exact domain and action and keeps `job_id` visible fo
 The Services view reports the shared `wpfy-traefik` edge and the services derived for every managed site. A per-site restart accepts only the existing `site_cron` service allowlist for that site (`web`, `app`, and conditional `db`, `redis`, `sftp`, or `adminer`). Validation happens before the service reaches the Compose argument vector, so flag-shaped names, cross-site names, unavailable services, and `wpfy-traefik` are refused without running a restart.
 
 The shared edge has a separate destructive route. It requires the exact JSON body `{"confirm":"wpfy-traefik"}`. The browser states that restarting the edge affects every site and enables the action only after the same typed confirmation.
+
+## Client structure (rebuilt 2026-08-15, ADR 0032)
+
+The client is a set of plain ES modules served from `panel_static/`, with no
+build step. `panel.js` is the core — transport, session, router, confirmations,
+job polling, event stream, and the shell chrome — and every page is a separate
+module imported on first visit. Tabler 1.4.0 is vendored beside them
+(`tabler.min.css`, `tabler.min.js`, `tabler.LICENSE`, `tabler.PROVENANCE.md`),
+along with `qrcode.min.js` for TOTP enrolment. Nothing loads from a third-party
+origin; the panel CSP is `default-src 'self'`.
+
+Each page receives `ctx.params`, `ctx.mount`, `ctx.signal`, `ctx.header` and
+`ctx.onLeave`. The signal is a per-navigation `AbortController`, so a response
+that arrives after the operator has moved on is discarded rather than rendered
+under the wrong site.
+
+### Routes
+
+```text
+/dashboard                     /sites            /sites/new
+/site/<domain>/<tab>           /events           /account/settings
+/admin/users                   /admin/services   /admin/settings
+/admin/instance                /admin/backup     /admin/firewall
+/admin/mail                    /admin/basic-auth /admin/jobs/<id>
+```
+
+`/admin/jobs` redirects to `/events`; the jobs list is the header popover.
+`/admin/notifications` redirects to `/admin/mail`.
+
+### Site detail: five tabs
+
+| Tab | Absorbs |
+|---|---|
+| Overview | Overview, Logs, Activity, Runtime, Services, SSL state |
+| Settings | Config, PHP, Cache, Vhost, Security, and the delete danger zone |
+| Data | Databases, Backups |
+| Access | SFTP, Files, WP-CLI |
+| Automation | Cron |
+
+Every pre-rebuild tab path redirects onto one of these for one release, so
+existing bookmarks and the links elsewhere in this document keep working.
+
+### Running operations
+
+Long operations return `202 {"job_id": ...}` and are polled at
+`GET /api/jobs/<id>`. They are rendered in a header popover that lives in the
+shell, so an operation started from one page stays visible after navigating
+away. The progress bar is indeterminate: jobs append step strings and never
+declare a total, so a percentage would be fabricated. `/admin/jobs/<id>` shows
+the full step log for one operation.
+
+Job state is held in memory. A panel restart loses in-flight jobs; polling then
+returns 404 and the client says the panel restarted and points at Events, which
+is the durable record.
+
+## Firewall
+
+```text
+GET    /api/firewall
+POST   /api/firewall/install
+POST   /api/firewall/ports
+DELETE /api/firewall/ports
+POST   /api/firewall/enable
+POST   /api/firewall/disable
+```
+
+`GET /api/firewall` returns both halves of the page: `enforcement` (fail2ban,
+which bans addresses that misbehave) and `ports` (ufw, which decides whether a
+connection is accepted at all). The `ports` object carries `installed`,
+`active`, `checked`, the default policies, `ssh_port`, the parsed `rules`, and
+the preset list. **`checked: false` means nothing was read** — ufw absent, the
+probe failed, or the runtime skip is set — and `active: false` alongside it is
+"not known", not "off".
+
+wpfy does not install `ufw`. A host without it reports that and the command to
+install it.
+
+Two guards protect the connection the panel is reached over:
+
+- `POST /api/firewall/enable` allows the SSH port before enabling the firewall.
+  `ufw enable` applies default-deny the instant it runs, so a rule added
+  afterwards would arrive over a connection that no longer exists.
+- Denying the SSH port, or deleting the allow rule carrying it, requires
+  `confirm` to equal the SSH port as a string. The port is read from
+  `sshd_config`, so a host moved off 22 is guarded where it actually listens,
+  and a range that contains it (`20:30`) is guarded too.
+
+`POST /api/firewall/disable` requires `{"confirm": "disable"}`; it opens every
+port on the host at once.
+
+## Mail
+
+```text
+GET    /api/notifications/smtp
+PUT    /api/notifications/smtp
+POST   /api/notifications/smtp/test
+DELETE /api/notifications/smtp
+```
+
+The page is called Mail, not Notifications: it configures an SMTP transport, and
+nothing in wpfy sends mail on its own — `smtp.send_test_message` has one caller,
+the explicit test. The page says so rather than implying an alerting engine
+exists.
+
+The password is write-only and never returned. A `PUT` with `password` omitted
+or empty keeps the stored value; only a non-empty value replaces it. The first
+write must supply one. `PUT /api/backup/remote` follows the same rule for
+`secret_key`.
