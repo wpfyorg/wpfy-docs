@@ -1,5 +1,22 @@
 # Decision Log
 
+## 2026-08-15: Validate the panel rebuild against a real host before merging
+- Decision: The ufw port management and the domainless exposure were run against
+  the validation VPS, and seven defects found there were fixed with a test each.
+  The two mode-defining ones: `wpfy panel --public` did not exist, so domainless
+  exposure was unreachable by the command it told operators to run; and the
+  first-run setup secret was keyed to `edge_bind`, which a domainless panel is
+  not, so an administrator could be created over the open internet with no
+  secret at all.
+- Reason: The offline suite stubs `subprocess.run` and builds `PanelConfig`
+  directly, so it exercises neither the real `ufw` nor the command an operator
+  types. Every one of these passed offline. Real ufw prints rule comments inside
+  the `From` column and prints no rule list at all while inactive; real Traefik
+  accepts a sha512crypt basicAuth line and then rejects the correct password
+  forever. None of that is visible from a green suite.
+- Alternatives: Merge on the strength of the offline tests. Rejected: two of the
+  findings were security defects in the path the whole feature exists for.
+
 ## 2026-08-15: Publish the panel without a domain, over self-signed TLS
 - Decision: `wpfy panel expose --no-domain` binds the panel on the host's public
   address over a self-signed certificate and prints its SHA-256 fingerprint next

@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-08-15 — Validation VPS pass on the panel rebuild
+
+Ran the ufw port management and the domainless exposure against
+155.94.241.76 (Ubuntu 24.04, ufw 0.36.2, live Traefik + two sites). Seven
+defects, each fixed with a test.
+
+ufw: an inactive ufw prints no rule list, so configured rules read as absent
+(`ufw show added` is the only listing that survives it being off); real ufw
+prints the rule comment inside the `From` column, which put comment text in
+the rendered source, defeated the IPv6-twin dedupe, and made a
+source-restricted rule undeletable from the panel.
+
+Domainless exposure: the mode was unreachable by the command it printed
+(added `wpfy panel --public`); the setup secret was keyed to `edge_bind`, so
+an administrator could be created over the internet with no secret — proven
+from a laptop; the printed setup link could not authenticate the request that
+carried it; an active ufw blackholed the panel with no explanation; and the
+basic-auth credential was hashed with sha512crypt, which Traefik cannot
+verify, so it refused the correct password forever.
+
+Proven working afterwards: SSH survives `enable()`, the guards refuse the SSH
+port and any range covering it, the fingerprint agrees with what the browser
+is offered, the setup link creates the first administrator over the internet
+and is single-use, and Traefik enforces basic auth 401/401/200.
+
+Ran ufw behind a keepalive watchdog that disables it if I stop checking in.
+Host restored: router file, firewall, and units all back as found; both sites
+serving 200.
+
 ## 2026-08-05 - Validate site field vocabularies before persistence
 - Added shared PHP, Let's Encrypt, and DNS-provider vocabulary checks at the
   create/update lifecycle choke points before preflight, scaffold rendering, or

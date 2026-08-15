@@ -1,6 +1,6 @@
 # ADR 0033: Publish the panel without a domain, over self-signed TLS
 
-- Status: Accepted (implemented, not yet validated on a real host)
+- Status: Accepted (implemented, validated on the VPS 2026-08-15)
 - Date: 2026-08-15
 
 ## Context
@@ -82,8 +82,33 @@ rejected because it would forge a second field in the htpasswd line.
 - `openssl` becomes a hard requirement for this mode specifically. A host
   without it is told so and pointed at the domain path, rather than silently
   falling back to plaintext.
-- **Not yet validated on a real host.** The offline suite stubs `subprocess.run`
-  for Docker but exercises `openssl` and a real TLS handshake against the
-  generated certificate. What it cannot prove is the public-address detection,
-  the firewall interaction on 3939, or the Traefik middleware reload. Those need
-  a pass on the validation VPS before this is called done.
+- **Validated on the VPS (155.94.241.76) on 2026-08-15**, which found five
+  defects the offline suite could not see, because it builds `PanelConfig`
+  directly and so never runs the command an operator would type:
+
+  1. The mode was unreachable. `expose --no-domain` printed
+     `wpfy panel --host <ip> --port 3939`; a non-loopback host without
+     `--edge-service` is refused, and nothing set `self_signed_tls`, so the TLS
+     this whole decision rests on was never wired. `wpfy panel --public` now
+     re-derives the address the certificate was issued for.
+  2. **First-run setup was ungated over the internet.** The secret requirement
+     keyed off `edge_bind`, and a domainless panel is not edge-bound. An
+     administrator was created on the VPS from a laptop with no secret at all.
+     The condition is now "can this request have come from off the host".
+  3. The printed setup link could not authenticate anything: the secret was
+     only read from the request body, so the request carrying it got 401. It
+     now authenticates the setup routes and nothing else, is checked without
+     being spent, and a public panel prints no run token — that token is a full
+     admin grant, and a public panel writes it into the terminal and journal.
+  4. An active ufw blackholes the panel silently, because it is a host process
+     while the Docker-published ports bypass ufw's INPUT chain entirely.
+     `expose --no-domain` now reports a closed port and the command to open it.
+  5. Panel basic auth rejected the correct password. sha512crypt is what nginx
+     verifies for the per-site gate; Traefik's basicAuth understands MD5-APR1,
+     SHA1 and bcrypt only, so it loaded the middleware without a log line and
+     refused forever. Now APR1, verified through real Traefik: 401 / 401 / 200.
+
+  Proven end to end afterwards: public-address detection, the IP SAN, the
+  fingerprint agreeing with `openssl` and with what the browser is offered, the
+  setup link creating the first administrator over the internet, that link
+  being single-use, and the session working afterwards.

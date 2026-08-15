@@ -37,6 +37,12 @@ The account form requires first/last name, username, email, a password of at lea
 
 The TOTP step discloses one seed and QR code, verifies a real authenticator code before persistence, and then removes the setup privilege. Skip is available only after a second confirmation stating that `wpfy panel expose` will refuse without a factor. The exposure gate is unchanged.
 
+### Setup without a domain (ADR 0033)
+
+`wpfy panel expose --no-domain --confirm expose` prepares a public, self-signed panel on port 3939. It prints the URL with a one-time setup secret in the **fragment** (`https://<ip>:3939/#setup=…`), the certificate's SHA-256 fingerprint to check against the browser warning, and — when the firewall is active and the port is closed — the `ufw allow` command needed to reach it at all. Start it with `wpfy panel --public`, which re-derives the address the certificate was issued for; passing a public `--host` to a plain `wpfy panel` is refused.
+
+Over that address the setup routes accept the secret **as the bearer token**, because a public panel prints no run token: the run token is a full admin grant and would land in the terminal and the systemd journal. The secret authorises the setup routes and nothing else (403 elsewhere), is burned by account creation, and expires after an hour. `GET /api/setup/status` reports `edge_bound: true` there.
+
 Install state lives in `<config>/panel-state.json` at mode 0600. It records the stable install UUID, telemetry preference/last-send time, and licence acceptance identity/time/version. User records add first name, last name, and email; older records read with empty profile fields.
 
 ## Telemetry controls

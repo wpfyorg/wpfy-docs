@@ -18,8 +18,14 @@
   `/api/firewall/ports|enable|disable`. `enable()` allows the SSH port read from
   `sshd_config` before the firewall comes up; deny and delete refuse that port
   unless the request carries it as a typed confirmation. wpfy never installs
-  `ufw`. **Not yet validated on a real host** -- the offline suite stubs
-  `subprocess.run`, so this needs a validation-VPS pass.
+  `ufw`. Validated on the VPS 2026-08-15: rules are read from `ufw show added`
+  while the firewall is off (an inactive ufw prints no rule list), the IPv6 twin
+  of a rule is folded into one row, and the rule comment is split out of the
+  `From` column -- glued on it broke both the dedupe and the delete path.
+- Domainless panel exposure validated on the VPS 2026-08-15 (ADR 0033), after
+  five defects including two security ones: setup over a public address was
+  ungated, and the panel is reached with `wpfy panel --public`, which did not
+  exist. Panel basic auth uses APR1 -- Traefik cannot verify sha512crypt.
 - Write-only secrets keep their stored value when the field is blank
   (2026-08-15): `PUT /api/backup/remote` and `PUT /api/notifications/smtp`.
 - Password minimum enforced in `panel_auth._validate_password` (2026-08-15), so
