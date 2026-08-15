@@ -1,5 +1,32 @@
 # Worklog
 
+## 2026-08-15 (later) — Clean-VPS install pass
+
+Wiped box, `install.sh` from a branch tarball with a checksum, then stack,
+panel, and both exposure modes. Six defects, each with a test.
+
+Installer: `wpfy stack install` reported `fail2ban: FAIL` on every fresh host
+and the rollback removed the package it had just installed. Two causes -- the
+panel jail's logpath does not exist until the panel's first auth failure, and
+the `fail2ban-client ping` check raced the socket the server binds after
+`systemctl start` returns.
+
+Panel: the dashboard opened on "1 service degraded: wpfy-traefik" against a
+healthy container, because `traefik_status()` returns the whole `docker compose
+ps` table and both the services list and the overview card used it as a status
+field; underneath, every client surface treated `running` as the only healthy
+value, so anything with a healthcheck read as degraded.
+
+Exposure: `expose --domain` succeeded while ACME could never register (the
+placeholder `admin@localhost` contact), and storing a basic-auth credential made
+wpfy's own router unrecognisable -- which is the exact condition that stops the
+credential being applied.
+
+Proven working after: first-run setup completed through the real UI over the
+setup link (fragment read, stripped, used as bearer), TOTP enrolled and
+verified, sign-in, SSE stream, a Let's Encrypt certificate for
+panel.wpfydev.top, and basic auth enforced by real Traefik (401/401/200).
+
 ## 2026-08-15 — Validation VPS pass on the panel rebuild
 
 Ran the ufw port management and the domainless exposure against
