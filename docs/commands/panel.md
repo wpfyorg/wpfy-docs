@@ -37,6 +37,20 @@ The account form requires first/last name, username, email, a password of at lea
 
 The TOTP step discloses one seed and QR code, verifies a real authenticator code before persistence, and then removes the setup privilege. Skip is available only after a second confirmation stating that `wpfy panel expose` will refuse without a factor. The exposure gate is unchanged.
 
+### Exposing on a domain
+
+`wpfy panel expose` with no arguments asks for what it needs rather than printing a usage error:
+
+```text
+Panel domain (blank to cancel): panel.example.com
+Type panel.example.com to expose the panel: panel.example.com
+Email for Let's Encrypt (used to issue the certificate, blank to skip): ops@example.com
+```
+
+The typed confirmation is unchanged — the domain must be retyped exactly. The contact address is asked for only when the host has none: a fresh install ships `admin@localhost`, which Let's Encrypt rejects at account registration, so without it the router is written and the certificate never issues. It is stored and applied before the router is written, because `expose` re-renders the Traefik static config and recreates the container. `--domain`, `--confirm`, and `--email` cover scripted runs; with no TTY the command refuses with instructions instead of prompting.
+
+`expose --domain` also refuses outright when no usable contact address is configured and none is supplied, matching the guard site SSL has had since ADR 0016.
+
 ### Setup without a domain (ADR 0033)
 
 `wpfy panel expose --no-domain --confirm expose` prepares a public, self-signed panel on port 3939. It prints the URL with a one-time setup secret in the **fragment** (`https://<ip>:3939/#setup=…`), the certificate's SHA-256 fingerprint to check against the browser warning, and — when the firewall is active and the port is closed — the `ufw allow` command needed to reach it at all. Start it with `wpfy panel --public`, which re-derives the address the certificate was issued for; passing a public `--host` to a plain `wpfy panel` is refused.

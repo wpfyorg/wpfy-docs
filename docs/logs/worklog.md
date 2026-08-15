@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-08-15 (later still) — Site wizard verified, expose now asks for its inputs
+
+Created `wiz.wpfydev.top` through the panel wizard end to end on the clean VPS:
+domain validation refusing `not a domain`, the correcting keystroke clearing
+the error without rebuilding the input, preview-plan dry run, then a real
+create job (preflight, scaffold, bootstrap, runtime). Site came up ready with a
+Let's Encrypt certificate and served WordPress over HTTPS. The success screen
+links to the domain, not the job id, and neither the WordPress admin password
+nor the SFTP password appears in the job payload `GET /api/jobs` returns.
+
+One defect: the site Overview showed a working site's status in red, because
+the badge tested for "healthy" -- a value `site_health` never emits. Green was
+unreachable for every site in every state.
+
+`wpfy panel expose` now asks for the domain and, when the host has no ACME
+contact, the email -- the thing that decides whether a certificate can issue at
+all. Set before the router is written, so Traefik picks it up.
+
 ## 2026-08-15 (later) — Clean-VPS install pass
 
 Wiped box, `install.sh` from a branch tarball with a checksum, then stack,
