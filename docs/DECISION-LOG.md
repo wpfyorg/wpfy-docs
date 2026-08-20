@@ -1,5 +1,57 @@
 # Decision Log
 
+## 2026-08-21: Traefik reads Docker through an allowlisted socket proxy
+- Decision: Traefik no longer mounts `/var/run/docker.sock`. A digest-pinned
+  `wollomatic/socket-proxy` holds the socket on a new `internal: true`
+  `wpfy-docker-socket` network, publishes no host port, and allows only
+  `GET /version`, `GET /v1.NN/(version|containers/.*|events.*)` and
+  `HEAD /_ping`. Traefik's provider endpoint is `tcp://socket-proxy:2375`.
+  Recorded as ADR 0034.
+- Reason: A read-only socket mount restricts the file, not the API. Traefik
+  could create containers, bind-mount any host path, and exec into a site --
+  root on the host, indirectly -- while needing only the container list and the
+  event stream. Both pentests recorded it as unremediated debt.
+- Alternatives: keep the direct mount (the finding stands); drop the Docker
+  provider for generated file config (removes the socket, but every site
+  mutation becomes an edge config write and every site's labels move);
+  `tecnativa/docker-socket-proxy` (category flags grant whole namespaces
+  including POST, where the wollomatic regex is per method and path).
+- Consequence: This is reach reduction, not confidentiality. `containers/.*` is
+  what Traefik needs to route, and it returns container environment, so an
+  attacker owning the edge can still read site database credentials. Traefik
+  `depends_on` the proxy; a dead proxy means file-provider routes only. Live
+  proxy behaviour is still unproven -- Docker Desktop denied the proxy the
+  socket, so `tests/docker-runtime-hardening.sh` skipped every live API
+  assertion. It needs a Linux host before any release claim.
+
+## 2026-08-21: Close the rc5 pentest findings in the runtime and the panel
+- Decision: Five changes, none of which alter a documented interface. The
+  generated Nginx serves `/healthz.html` only to `127.0.0.1` and `::1`;
+  `system_diagnostics()` maps every subprocess result to an allowlisted state
+  (`running`/`stopped`/`unavailable`/`available`/`consistent`/`mismatch`) with
+  fixed messages instead of returning raw `docker compose ps` output; a
+  self-signed or domainless panel answers `421` to any Host other than its
+  configured one; `auth.login` caps its body at 8 KiB, rejects malformed
+  material before any KDF, and admits scrypt work through a non-blocking gate
+  (2 global, 1 per client) that returns a generic `429` with `Retry-After`;
+  and every runtime image reference moves into `src/wpfy/image_references.py`
+  pinned by digest, with `docs/IMAGE_UPDATE_POLICY.md` owning the update
+  procedure.
+- Reason: The rc5 pentest confirmed a public liveness oracle on
+  `/healthz.html`, container names, images, commands, and host port bindings
+  leaking through the admin diagnostics endpoint, and measured 0.18s of scrypt
+  per login -- cheap saturation for anyone with a handful of addresses.
+  Mutable image tags were carried over from rc4 as supply-chain debt.
+- Alternatives: rate-limit login instead of admitting it (a queue still spends
+  the CPU, and the domainless listener has no Traefik limiter in front of it);
+  redact diagnostics strings by pattern (an allowlist of states cannot leak a
+  string nobody wrote into it).
+- Consequence: Login can now fail with `429` before any credential is checked,
+  which is a new response for a correct password under load. `scrypt`
+  parameters, the dummy KDF for unknown users, TOTP, CSRF and the per-user
+  throttles are unchanged. `atmoz/sftp:alpine` stays unpinned as a documented
+  exception -- its manifest is amd64-only and WPFY supports arm hosts.
+
 ## 2026-08-15: Validate the panel rebuild against a real host before merging
 - Decision: The ufw port management and the domainless exposure were run against
   the validation VPS, and seven defects found there were fixed with a test each.
