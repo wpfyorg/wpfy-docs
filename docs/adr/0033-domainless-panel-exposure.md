@@ -112,3 +112,46 @@ rejected because it would forge a second field in the htpasswd line.
   fingerprint agreeing with `openssl` and with what the browser is offered, the
   setup link creating the first administrator over the internet, that link
   being single-use, and the session working afterwards.
+
+## Amendment, 2026-08-21: the panel now rate-limits its own requests
+
+This ADR replaced Traefik's TLS with a self-signed certificate and a
+fingerprint. It did not replace the other half of what routing through Traefik
+bought. The panel router carries a `rateLimit` middleware
+(`panel_exposure.RATE_LIMIT_AVERAGE`/`RATE_LIMIT_BURST`, 10/20); a panel bound
+directly on 3939 never passes through Traefik and so inherited none of it.
+Credential guessing was still priced by the login throttle and the scrypt
+admission gate in `panel_auth`, but general request-rate protection was absent,
+and this ADR did not say so. The README did.
+
+The limiter now lives in `PanelHandler` itself, checked once per request from
+`do_GET`/`do_POST`/`do_PUT`/`do_DELETE`/`do_PATCH`. Putting it in the handler
+rather than behind a domainless branch is deliberate: domainless is where the
+gap was visible, but the handler is where all three exposure modes converge, so
+one guard covers Traefik-fronted, direct-bind, and loopback alike. Behind
+Traefik it is a harmless second layer.
+
+It is keyed on `resolve_client_address` — the same resolution login throttling
+uses, which believes a forwarded header only from a trusted edge and walks the
+chain right-to-left past our own hops. An attacker cannot prepend entries to
+claim a fresh bucket, and cannot pin their cooldown onto someone else's address.
+
+Two consequences worth recording:
+
+- **The burst is a thread-spike, not just a counter.** The panel runs on
+  `ThreadingHTTPServer`, which spawns a thread per request, so burst size is
+  the concurrency an attacker gets before throttling engages. The default
+  (burst 40, refill 10/s) is set with headroom over a measured cold boot of
+  ~16 requests and deliberately *not* raised to accommodate callers that walk
+  the whole API surface.
+- **A full route sweep is not an operator access pattern.** Enumerating all
+  101 routes in one pass is something this project's own gate tests in
+  `tests/gates/` do, not something a panel user does. Those callers raise
+  `PanelConfig.rate_limit_burst` for their own server instead of loosening the
+  production default. The bucket table belongs to the handler built by
+  `make_panel_server`, not to the module, so two panels in one process never
+  share a budget.
+
+Still not addressed: this is a per-address limiter with no global ceiling, so a
+distributed flood is throttled per source and not in aggregate. The bucket table
+is bounded by TTL-based pruning above a threshold, not by a hard cap.

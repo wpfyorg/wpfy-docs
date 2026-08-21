@@ -1,5 +1,45 @@
 # Worklog
 
+## 2026-08-21 (later) — TODO round: rate limiter, SMTP rename, rc5 docs
+
+Worked the actionable half of `TODO.md`. The items still owed a Linux host —
+live socket-proxy allowlist enforcement, fail2ban banning for real, ufw/IPv6
+beyond one box, the diagnostics re-probe — were not touched and remain open.
+
+Panel request rate limiter. `expose --no-domain` never passes through Traefik,
+so it inherited none of the panel router's `rateLimit`. The guard went into
+`PanelHandler` rather than behind a domainless branch, so it covers
+Traefik-fronted, direct-bind and loopback with one check. First cut used a
+module-global bucket table and burst 40; that failed six gate tests with 429,
+and an isolated gate test failed standalone too — the panel declares 101 routes
+and the G1/G2 sweeps walk all of them twice in one test. Resisted raising the
+burst: on `ThreadingHTTPServer` burst size is the thread-spike an attacker
+gets, so tuning it to fit a route sweep weakens the control. Instead the bucket
+table moved into the `make_panel_server` handler closure and the limits onto
+`PanelConfig`, so the sweeping gate tests raise their own ceiling. Suite: 2064
+passed, up from 2059 with no regressions. ADR 0033 amended.
+
+Mail page renamed to SMTP. Copy only — route `/admin/mail`, API paths and
+stored keys unchanged. `smtp.py` stores a transport and sends a test message;
+nothing sends mail on an event, so the old name promised alerting that does not
+exist. README now says so outright. The nav icon moved from the notification
+bell to the envelope already in the sprite, and the orphaned `i-bell` symbol
+was dropped.
+
+Docs for rc5. README pointed at `releases/tag/v1.0.0-rc4` in eight places and
+that tag was never cut — newest is rc3. Links now target rc5 and resolve once
+the tag exists; the install snippet keeps a marked placeholder for the
+source-archive checksum. Validation claims were re-derived from TODO rather
+than relabelled: the socket-proxy allowlist is stated as proven configuration,
+not enforcement. ROADMAP rewritten against the rebuilt panel. Hero screenshot
+replaced with the rebuilt-panel capture — its chip still reads rc4 and its
+sidebar still says Mail, so it wants a re-capture.
+
+Also: `stack acme-email` now names `wpfy stack install --nginx` instead of
+saying a restart is required and stopping there, and first-run setup copy stops
+mentioning a run token on domainless panels, where none is printed.
+
+
 ## 2026-08-15 (later still) — Site wizard verified, expose now asks for its inputs
 
 Created `wiz.wpfydev.top` through the panel wizard end to end on the clean VPS:
