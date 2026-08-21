@@ -102,3 +102,50 @@ refused — reported SKIP rather than pass.
 
 Until that script runs on a Linux host, the allowlist is proven as written
 config and not as enforced behaviour. Release notes must not claim otherwise.
+
+## Amendment, 2026-08-21: enforcement proven, after three defects that made it never run
+
+This ADR shipped in rc5 with the allowlist proven only as written
+configuration. `tests/docker-runtime-hardening.sh` reported SKIP for every
+behavioural check on the macOS Docker Desktop host it was written on, because
+the proxy container was denied the socket there. That skip was recorded as a
+known gap rather than investigated, and it was hiding a real outage.
+
+Running the published `v1.0.0-rc5` on a clean Ubuntu 24.04 host found three
+defects in the generated compose, each fatal on its own:
+
+1. **No `group_add`.** The container runs as an unprivileged image user, and
+   `/var/run/docker.sock` is mode 660 `root:docker`. It exited immediately with
+   `socket not available ... connect: permission denied`.
+2. **Loopback listener.** The image defaults to `listenaddress=127.0.0.1:2375`
+   and `SP_LISTENIP` was never set, so Traefik's `tcp://socket-proxy:2375`
+   could not have reached it even had the socket opened.
+3. **Wrong variable name.** The source filter was written `SP_ALLOW_FROM`; the
+   pinned image reads `SP_ALLOWFROM`. Verified A/B against the same digest:
+   `SP_ALLOW_FROM=traefik` yields `allowfrom=127.0.0.1/32` (the default),
+   `SP_ALLOWFROM=traefik` yields `allowfrom=traefik`.
+
+Worth stating precisely, because the opposite is the natural assumption:
+defect 3 was **not** an open door. The ignored value fell back to a *more*
+restrictive default. The consequence of all three together was availability —
+Traefik never obtained a Docker provider, so on a clean install no site was
+routable through the edge at all.
+
+The host's `docker` GID is now resolved at render time. If no such group
+exists, rendering **fails loudly** rather than emitting a compose file that
+cannot work; silently rendering something broken is precisely what let this
+ship.
+
+With the fix, on Linux the suite reports `failures=0 skips=0`, and the four
+checks that had only ever skipped now pass — `/version`, `/v1.47/containers/json`
+and `/v1.47/events` reachable, and **POST mutation refused with HTTP 405**.
+That last one is the difference between an allowlist and a comment, and it is
+the first time this ADR's central claim has been backed by a real run.
+End-to-end confirmation: an external request to a site returned HTTP 200
+through Traefik.
+
+Standing lesson for this repo: a SKIP in a behavioural harness is not a pass,
+and an offline suite that stubs `subprocess.run` cannot see any of this class
+of defect. The harness itself also had a gap — its synthetic compose omitted
+the `user:` directive real site compose always sets — so it could not have
+reproduced production conditions even where it did run.
