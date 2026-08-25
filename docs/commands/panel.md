@@ -154,6 +154,45 @@ The `login_shield` status object carries `enabled`, plugin `{slug, version, owne
 
 The checkbox is dirty-tracked: only an actual change sends `PUT /security {"fail2ban": true|false}`. The panel route calls the same `set_fail2ban` operation layer as the CLI (host ensure, plugin install/deactivate, bridge guard, jail render, validate/reload, fixture proof, rollback); no business logic is duplicated in the panel. Preview change text is `enable WordPress fail2ban login shield` / `disable WordPress fail2ban login shield`; an unchanged toggle is a no-op. A degraded health (`health: degraded` plus `degraded_reason`, for example a stale Docker action or an out-of-band plugin deactivation) renders as a warn row while every other row stays visible. The payload never exposes the auth log, account hashes, client IPs, or any credential; only the last-detected-failure UTC timestamp surfaces.
 
+## Account endpoints
+
+```text
+GET    /api/auth/me
+PUT    /api/auth/profile
+POST   /api/auth/password
+GET    /api/auth/sessions
+DELETE /api/auth/sessions/<session_id>
+POST   /api/auth/totp            (begin, or verify with code)
+DELETE /api/auth/totp            (disable; password + current code)
+DELETE /api/auth/totp/pending    (discard a begun enrollment)
+```
+
+Sign-in is two steps. `POST /auth/login` with `username` and `password` verifies the credential first: accounts without TOTP receive the session token immediately, while TOTP-enabled accounts receive `{mfa_required: true, challenge}` and no session. The challenge is an opaque single-use id bound to the requesting client, expires in 120 seconds, and is exchanged -- together with a current code -- at `POST /auth/login/totp` for the real session. A wrong or expired code burns the challenge; the client returns to the password step. Failure accounting, lockouts, throttles, and the auth-log reason vocabulary are identical across both steps, so fail2ban sees one surface. The combined username/password/code form keeps working for scripted clients.
+
+These routes are session-scoped and keyed to the authenticated principal: the username in a request body is ignored, never honored. Site managers reach all of them through the manager allowlist without gaining system-scoped access.
+
+`GET /auth/me` returns `username`, `role`, `sites`, `version`, `first_name`, `last_name`, `email`, and `totp_enabled` -- everything the account pages need, reachable at session scope.
+
+`PUT /auth/profile` accepts `first_name`, `last_name`, `email`; unknown fields are rejected. Profile fields sit outside the credential fingerprint, so saving one does not disturb sessions.
+
+`POST /auth/password` requires `current_password` and `new_password`. A wrong current secret answers 400 (not 401: the client shell signs out on any 401, which would destroy the form mid-edit). On success the account's other sessions are revoked and the acting session survives (`keep_token`), so the operator is not signed out of the tab they are using.
+
+TOTP: `POST /auth/totp` with no body begins enrollment and returns `{secret, uri}` once per TTL window; re-beginning after disclosure fails until the pending enrollment expires or is cancelled. `POST` with `code` verifies and activates. `DELETE /auth/totp/pending` discards a begun enrollment so the next begin issues a fresh secret immediately. `DELETE /auth/totp` demands the password plus a current code. Activating TOTP changes the credential fingerprint, which invalidates every existing session by design; the next login needs password + code.
+
+`GET /auth/sessions` lists the account's sessions with a `current` marker; `DELETE /auth/sessions/<id>` revokes one. Revoking the current session walks the standard signed-out path.
+
+## Panel basic-auth settings
+
+```text
+GET    /api/settings/basic-auth
+PUT    /api/settings/basic-auth   {username, password}
+DELETE /api/settings/basic-auth
+```
+
+System-scoped (admins only). The stored APR1 hash never leaves its 0600 file; reads expose only `{enabled, username, auth_state}`. `auth_state` is derived from the router's own content, not from intent: `enforced` means a recognized router's basicAuth middleware carries exactly the stored credential line; `staged` means a credential is stored but verifiably nothing enforces it (no router file, or a recognized router without middleware); `stale` means a recognized router enforces a DIFFERENT credential than stored -- or enforces one while nothing is stored (orphaned) -- so the old prompt is still live either way; `unknown` means a router exists but wpfy cannot attribute it (unreadable, malformed, unrecognized), so enforcement can be verified neither way; `off` means nothing stored and verifiably no middleware anywhere. The Settings card renders staged as Staged, stale as Stale, unknown as Unverified, and treats stale as gated (Disable available) even with nothing stored. For `unknown` the Disable action is hidden rather than offered: the backend guarantees a 409 while the router is unattributable, so the card points at the actual remedy -- repair or remove the unrecognized router, then retry. The save toast is derived from the returned `auth_state`, so a staged or unverifiable save does not announce itself as enabled.
+
+Disable is convergent: if the recognized router's rewrite fails, the credential file is restored byte-for-byte (including mode) so disk state matches the still-enforced router, and a retry repairs it. If the panel is exposed but no managed router is recognized, disable refuses with 409 and keeps the credential, because basic auth may still be enforced by something wpfy does not manage.
+
 ## Cron endpoints
 
 ```text
@@ -278,6 +317,15 @@ Two guards protect the connection the panel is reached over:
 
 `POST /api/firewall/disable` requires `{"confirm": "disable"}`; it opens every
 port on the host at once.
+
+### Managed panel-edge rule (implemented)
+
+When panel exposure, panel-edge service installation, or firewall enablement
+needs the panel reachable from the managed edge, wpfy discovers the Docker
+`wpfy-panel-edge` private bridge facts and stages one exact UFW INPUT rule. The
+rule is limited to the bridge interface, private subnet, gateway destination,
+and TCP panel port; public 8642 is never opened. Disable removes wpfy
+marker-owned rules across ports while preserving operator-owned rules.
 
 ## Mail
 

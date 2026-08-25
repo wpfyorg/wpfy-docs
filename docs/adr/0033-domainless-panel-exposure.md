@@ -155,3 +155,28 @@ Two consequences worth recording:
 Still not addressed: this is a per-address limiter with no global ceiling, so a
 distributed flood is throttled per source and not in aggregate. The bucket table
 is bounded by TTL-based pruning above a threshold, not by a hard cap.
+
+## Amendment, 2026-08-23: basic-auth disable refuses when the router is not recognized
+
+This ADR's exposure model assumes wpfy knows the router serving the panel.
+When that holds, disabling panel basic auth is a two-step dance: remove the
+credential, rewrite the router. The convergent version restores the
+credential (bytes and mode) when the rewrite fails, so disk never claims
+"disabled" while Traefik still prompts, and a retry repairs instead of
+reporting "not configured".
+
+The amendment covers the case where the assumption itself breaks: the panel
+is exposed but `exposure_status()` cannot attribute it to a managed router
+(`domain` is None -- a hand-edited router, a leftover from another tool, or
+state wpfy does not recognize). The earlier fix silently skipped the rewrite
+here and reported success after deleting the credential, which is exactly
+wrong: an unmanaged router may still be enforcing basic auth from its own
+embedded htpasswd source, and the operator just watched the panel tell them
+it was gone.
+
+Disable now treats unrecognized-router exposure like a failed rewrite: the
+stored credential survives and the caller gets 409 with the cause. The
+`GET`/`PUT` settings payload carries an `enforced` flag (exposed AND domain
+recognized) so the UI can render stored-but-unenforced as Staged rather than
+Enabled. Resolution of a genuinely stale router remains out-of-band by
+design: wpfy refuses to guess at router state it does not own.

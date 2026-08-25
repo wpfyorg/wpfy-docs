@@ -1,5 +1,20 @@
 # Worklog
 
+## 2026-08-23 — Managed panel-edge UFW rule
+
+Implemented panel-edge firewall convergence. Wpfy dynamically discovers the
+Docker `wpfy-panel-edge` private bridge facts, then stages an exact UFW INPUT
+rule constrained to the bridge interface, private subnet, gateway destination,
+and TCP panel port. It never opens public 8642. Panel expose, service install,
+and firewall enable all converge the rule; disable removes only wpfy
+marker-owned rules across ports and preserves operator rules.
+
+Live security verification received Oracle APPROVE. Focused 324 tests passed;
+public panel/site HTTPS returned 200, bridge upstream returned 200, exactly one
+managed rule existed, and direct public 8642 was closed. The first post-restart
+502 was a transient 1--2 second restart gap and recovered, not a regression.
+The full suite was not completed locally because of duration.
+
 ## 2026-08-21 (later) — TODO round: rate limiter, SMTP rename, rc5 docs
 
 Worked the actionable half of `TODO.md`. The items still owed a Linux host —
@@ -557,3 +572,18 @@ serving 200.
 - Closed three gaps found while reading the paths this touched. The 12-character password minimum was enforced only by the first-run setup form. `PUT /api/backup/remote` and `PUT /api/notifications/smtp` demanded a write-only secret on every write, so a blank field wiped a working credential. Rendering the services view cost one metrics query per site; `metrics.latest_samples()` returns the newest sample for every scope in one query and drops readings older than fifteen minutes rather than presenting a stopped site's last sample as current.
 - Sweep: zero `innerHTML`, zero inline `style=` attributes, zero inline `on*=` handlers, zero native `confirm()`, zero dead markup from the old client. Every `onPanelEvent` registration is wrapped in `ctx.onLeave`. The strict xfail on `test_gate_a_user_management_view_exists` came off on its own terms -- `/admin/users` landed, it XPASSed, strict mode failed the run.
 - Not done, and not claimed: the ufw work mutates real host state and the offline suite stubs `subprocess.run`, so it needs a validation-VPS pass before it is called done. It was deliberately not exercised against the VPS unattended -- a wrong rule ordering drops SSH and cannot be recovered from here.
+
+## 2026-08-23 - Panel account self-service and honest basic-auth state
+
+- Shipped the account surface for every signed-in panel user, not just admins. Profile editing, password change, TOTP enrollment/disable, and session revocation are keyed to the session identity: the handler reads the username from the authenticated principal and treats any client-supplied username as noise, which is what makes it safe to open these routes to site managers through an explicit allowlist rather than system scope.
+- Password rotation demands the current secret (400 on mismatch, not 401 -- the shell's api() signs out on any 401, which would kill the form mid-edit), revokes the account's other sessions, and keeps the acting one via keep_token so the user is not signed out of the tab they are typing in.
+- TOTP enrollment got the missing exit: Cancel now calls DELETE /api/auth/totp/pending, discarding the pending secret server-side. Before, closing the page left "already disclosed" until the TTL expired, so a cautious operator who thought better of enrolling could not retry without waiting.
+- Enabling TOTP changes the credential fingerprint, which invalidates every existing session by design; the account page surfaces this instead of hiding a surprise sign-out.
+- The settings page gained a Panel access card over GET/PUT/DELETE /api/settings/basic-auth. The payload carries a server-derived auth_state because stored and enforced stopped being the same thing: the router's own rendered content decides between enforced (recognized router carries exactly the stored credential), staged (verifiably not applied), stale (a router enforces a different-or-orphaned credential -- the old prompt is live even though it is not ours), and unknown (exposed but unattributable -- may still be prompting). Amber copy says exactly which, the footer stops claiming the domain is guarded when that is not known, and the third Oracle pass caught the first cut lying by omission: an orphaned router credential read as off, and a stale one read as staged.
+- Disable became convergent in both failure directions. A failed router rewrite restores the credential file byte-for-byte (including mode) so disk matches the still-enforced router and a retry repairs it; an exposed-but-unrecognized router refuses with 409 naming the cause instead of reporting success while the prompt survives out-of-band.
+- Found while reviewing generated work: the earlier convergent-disable fix still silently skipped the rewrite when domain was None, which is precisely the case where basic auth may be enforced by something wpfy does not manage. The refusal path and its regression test came out of the second Oracle pass.
+- Suite at 2168 passing; phase-7 manager-allowlist gate extended with auth.totp.cancel and its derivation comment intact.
+
+- Fourth Oracle pass moved the remaining honesty burden into the UI layer: the state mapping was extracted into panel-access-state.js, an import-free pure module so node can execute it directly from pytest. Eight view-model cases now pin what each server state tells the operator -- including that unknown hides Disable instead of offering an action the backend will refuse with 409, that orphaned stale copy never says "stored here", and that the save toast is derived from the returned auth_state rather than announcing every write as "enabled". The first cut of the module conflated "may prompt" with "has stored credential"; its own test caught it before Oracle could.
+
+- Sign-in became two steps. The password step now stands alone: accounts without TOTP get their session immediately, TOTP accounts get a single-use challenge -- opaque, client-bound, 120 seconds -- and only then does the panel ask for a code at a new public route. The combined username/password/code form keeps working for scripted clients. Oracle's first pass caught the race that mattered: lockout and throttle were checked before the final state lock but not rechecked inside it, so pre-issued challenges could slip past a lockout that landed while they waited; the recheck now sits atomically with issuance, proven by a test that establishes the lockout between the pre-check and the transaction. Challenge creation is capped globally and per user, unrelated logins drain expired challenges, the UI clears a rejected code so it cannot burn fresh challenges, and {totp: null} follows the preserved combined path because presence of the field, not its value, selects the form.

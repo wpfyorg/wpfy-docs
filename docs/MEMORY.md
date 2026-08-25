@@ -22,6 +22,18 @@
   while the firewall is off (an inactive ufw prints no rule list), the IPv6 twin
   of a rule is folded into one row, and the rule comment is split out of the
   `From` column -- glued on it broke both the dedupe and the delete path.
+- Managed panel-edge UFW rule (implemented, 2026-08-23): wpfy dynamically
+  discovers Docker `wpfy-panel-edge` private bridge facts and stages an exact
+  UFW INPUT rule limited to the bridge interface, private subnet, gateway
+  destination, and TCP panel port; it never opens public 8642. Panel expose,
+  service install, and firewall enable converge the rule. Disable removes
+  wpfy marker-owned rules across ports while preserving operator rules. Live
+  security verification received Oracle APPROVE: focused 324 tests passed,
+  public panel/site HTTPS returned 200, bridge upstream returned 200, exactly
+  one managed rule existed, and direct public 8642 was closed. The first
+  post-restart 502 lasted 1--2 seconds during the restart gap, then recovered;
+  it was not a regression. The full suite was not completed locally because of
+  duration.
 - Domainless panel exposure validated on the VPS 2026-08-15 (ADR 0033), after
   five defects including two security ones: setup over a public address was
   ungated, and the panel is reached with `wpfy panel --public`, which did not
@@ -180,6 +192,16 @@
 - `SiteSpec.php_version` field drives image tag in `compose_content()`.
 - `site update --php` regenerates compose.yaml with new image tag and restarts.
 - Registry and `.env` both store `PHP_VERSION`.
+
+### Two-Step Panel Sign-In (rc6)
+
+`POST /api/auth/login` verifies the password first. No TOTP on the account: session token as before. TOTP enabled: `{mfa_required: true, challenge}` and no session. The challenge is an opaque `secrets.token_urlsafe(32)` id bound to the requesting client, expires in 120 s (`PENDING_LOGIN_TTL_SECONDS`), is single-use (burned under the state lock before any check), and is exchanged for a session at `POST /api/auth/login/totp`. Caps: `MAX_PENDING_LOGINS` 256 global, 8 per user; refusal counts as a client failure with auth-log reason "throttled". Lockout and client throttle are rechecked atomically inside the final `_STATE_LOCK` + `_store_lock()` transaction in `complete_login()` -- pre-checks alone are racy against concurrent redemptions. Presence of a `totp` key (even null) selects the preserved combined form. Failure accounting and reason vocabulary ("invalid_credentials"/"totp_failed"/"locked"/"throttled") are identical across both steps so fail2ban sees one surface. UI: step swap on `mfa_required`, rejected codes cleared on reset (visibility-tracked `required`, never static), dead-challenge 401s bounce to the password step.
+
+## Panel Account Self-Service (rc6)
+- Every signed-in user gets account pages: profile (name, email), password change (current secret required; other sessions revoked, acting session kept), TOTP enroll/disable behind reauthentication, and per-session revocation.
+- Routes are keyed to the session identity (`/api/auth/profile`, `/api/auth/password`, `/api/auth/sessions`, `/api/auth/totp`, `/api/auth/totp/pending`), so site managers get them via an explicit allowlist without system-scoped access.
+- `/api/auth/me` carries profile fields and `totp_enabled` so session-scoped pages prefill without overview access.
+- Panel basic auth is manageable from Settings: `GET/PUT/DELETE /api/settings/basic-auth` with a server-derived `auth_state` (`enforced`/`staged`/`stale`/`unknown`/`off`) read from the router's own content — `stale` covers both a mismatched credential and an orphaned one (router prompts while nothing is stored); disable restores the credential on router-rewrite failure and refuses (409) when the panel is exposed but no managed router is recognized.
 
 ## Planned / Deferred
 - WordPress Multisite (scheduled 1.1, ADR 0035): both subdirectory and
