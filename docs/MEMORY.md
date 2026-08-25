@@ -5,6 +5,38 @@
 - Target install UX: `curl -fsSL https://raw.githubusercontent.com/wpfyorg/wpfy/main/install.sh | sudo bash`.
 
 ## Implemented
+- Ponytail W1 mechanical batches completed (2026-08-25, local evidence only;
+  validation owner: orchestrator): W1-02 `try/except X: pass` →
+  `contextlib.suppress(X)` across `site_layout.py`, `site_security.py`,
+  `panel_auth.py`, `fail2ban_docker.py`, `fail2ban_host.py` — suppression
+  pytest 524 passed. W1-07 Path unlink sites →
+  `Path.unlink(missing_ok=True)` (dir-fd no-follow sites untouched) —
+  unlink-batch pytest 217 passed. W1-10 `smtp.py` `TLS_MODES`/validator now
+  derive from `typing.get_args(TLSMode)`, order and error text preserved —
+  4 passed. W1-03 tranche two: remaining modules import the shared lazy
+  `current_paths()` from `settings.py` with per-module `_current_paths`
+  aliases retained — path-access tests 86 passed. CodeDebrief artifacts
+  regenerated and validated OK, superseding the earlier blocked refresh.
+- Ponytail batch validation status (2026-08-25; validation owner:
+  orchestrator): W4-11 installer source identity — local shell tests pass
+  (`tests/installer-idempotency.sh`, `tests/installer-payload.sh`, offline
+  checks on a non-Linux host), and the disposable Ubuntu/VPS install gate
+  completed 2026-08-25: full staged installer end-to-end twice; corrected
+  failure-rollback probe exits 97 after a forced staged-source install
+  failure; `/opt/wpfy/app` symlink identical before/after the failed run
+  (`/opt/wpfy/releases/legacy-20260825013714-2557/app`); `wpfy --version`
+  runs after the failure. No independent installer review was performed.
+  W1-03 `_current_paths()` export — `tests/test_registry.py` +
+  `tests/test_events.py` = 27 passed offline. CodeDebrief refresh blocked by
+  unavailable analyzer; artifacts not regenerated.
+- Full offline suite (2026-08-25): `pytest -q` exit 0 — 2277 passed in
+  649.22s. It passed only after a test-only fixture correction in
+  `tests/test_edge_backup.py`: `_patch_traefik_paths` rebinds module-level
+  `PATHS` to a `dataclasses.replace(...)` copy with `state_dir` under the tmp
+  root (`WpfyPaths` is frozen and the edge-backup transaction lock resolves
+  its flock file from `settings.PATHS.state_dir` at call time); targeted
+  rerun 4 passed. Not performed: root/Docker-mutating shell tests,
+  independent installer review.
 - Panel rebuild on Tabler (2026-08-15, ADR 0032): the loopback panel client is
   rebuilt from scratch on vendored Tabler 1.4.0. Site detail is five tabs
   (Overview, Settings, Data, Access, Automation) with the old fourteen paths
@@ -90,6 +122,7 @@
 - Argparse CLI with all command groups: `site`, `stack`, `debug`, `clean`, `info`, `log`, `secure`, `maintenance`, `update`.
 - Root installer script `wpfy` bootstraps Ubuntu hosts, installs or verifies Docker and the Compose plugin, creates core directories, syncs the source tree, installs `wpfy` into `/opt/wpfy/venv`, exposes `/usr/local/bin/wpfy`, writes `/etc/wpfy/wpfy.conf`, and runs smoke checks.
 - Root installer source updates are staged through `/opt/wpfy/app.next`; the previous app tree is retained as `/opt/wpfy/app.previous` and restored if a later install step fails.
+- The public bootstrap migrates legacy unversioned `/opt/wpfy/app` and `/opt/wpfy/venv` into `/opt/wpfy/releases/legacy-<stamp>/` behind an `/opt/wpfy/current` symlink, and the bundled installer verifies the installed `wpfy` import resolves to the staged source instead of pip-installing (2026-08-25, VPS-evidenced; see the W4-11 batch note above).
 - Public bootstrap script `install.sh` downloads the GitHub source archive for `WPFY_REF` (default `main`), optionally verifies it with `WPFY_SOURCE_SHA256`, and runs the bundled `wpfy` installer with `--skip-wpfy-install`.
 - Public release export script `scripts/export-public.sh` copies only `.gitignore`, `LICENSE`, `README.md`, `install.sh`, `pyproject.toml`, `wpfy`, `src/`, public-safe `tests/`, `docker/`, and `.github/workflows/php-images.yml` into a separate public checkout under `.context/public-export/wpfy`. It supports a new-root export and rejects internal paths and known infrastructure identifiers.
 - Disposable-VPS validation tooling now exists as `scripts/vps-release-validation.sh` for local packaging/staging and `scripts/vps-release-validation-remote.sh` for numbered evidence capture on the target VPS.

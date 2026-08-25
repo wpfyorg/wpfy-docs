@@ -1,5 +1,80 @@
 # Worklog
 
+## 2026-08-25 (final) — Disposable-VPS installer gate closed (W4-11)
+
+Validation pass on the disposable Ubuntu VPS; docs recorded in CHANGELOG,
+MEMORY, and HANDOFF the same day.
+
+- The full staged installer completed end-to-end twice.
+- Failure-rollback probe: a forced staged-source install failure restored the
+  previous source and exited 97 (the failing step's status propagates through
+  `install_failed`, which restores then exits with the step status).
+- The `/opt/wpfy/app` symlink was identical before and after the failed run,
+  resolving to `/opt/wpfy/releases/legacy-20260825013714-2557/app` — the
+  versioned-layout migration preserved the prior release and rollback did not
+  disturb it.
+- `wpfy --version` ran successfully after the failure, proving the rolled-back
+  source stayed importable and executable.
+- Prior cleanup-trap defects corrected in both installers: `wpfy`
+  (`cleanup_session`) and `install.sh` (`cleanup`) used `[[ -n "$VAR" ]] &&
+  rm …`, which returns 1 when the variable is empty and could distort exit
+  statuses under `set -euo pipefail` inside traps; both are now explicit `if`
+  blocks ending in `return 0`. Covered by a new `tests/installer-idempotency.sh`
+  check ("installer cleanup succeeds without a session directory").
+- Follow-up the same day: full offline `pytest -q` passed — exit 0, 2277
+  passed in 649.22s. It needed one test-only fixture correction first:
+  `tests/test_edge_backup.py`'s `_patch_traefik_paths` now rebinds the
+  module-level `PATHS` to a `dataclasses.replace(...)` copy whose `state_dir`
+  sits under the tmp root — `WpfyPaths` is a frozen dataclass, and the
+  edge-backup transaction lock resolves its flock file as
+  `Path(settings.PATHS.state_dir) / "traefik.lock"` at call time, so the old
+  fixture left the lock outside the tmp tree; targeted rerun 4 passed. No
+  source changes.
+- Still not performed: root/Docker-mutating shell tests, independent
+  installer review. W1 tranche
+  focused counts (524 / 217 / 4 / 86 / 27) stand as recorded below; only W4-11
+  gained VPS evidence.
+
+## 2026-08-25 (later) — Ponytail W1 mechanical batches completed
+
+Implementation pass; this entry records completion and evidence only.
+
+- W1-02 (`try/except X: pass` → `contextlib.suppress(X)`): converted across
+  `site_layout.py`, `site_security.py`, `panel_auth.py`,
+  `fail2ban_docker.py`, `fail2ban_host.py`. Suppression-batch pytest —
+  524 passed.
+- W1-07 (`unlink()` guards → `Path.unlink(missing_ok=True)`): convertible
+  Path-based sites converted; the `os.unlink(..., dir_fd=...)` no-follow
+  sites stay as-is by design. Unlink-batch pytest — 217 passed.
+- W1-10 (`TLS_MODES` hand-copy + match validator →
+  `typing.get_args(TLSMode)` in `smtp.py`): Literal order, argparse choices
+  display, and error text preserved. TLS-modes pytest — 4 passed.
+- W1-03 tranche two: remaining modules import the shared lazy
+  `current_paths()` exported from `settings.py`; per-module `_current_paths`
+  names retained so test call sites and monkeypatch targets survive.
+  Path-access tests — 86 passed.
+- CodeDebrief artifacts regenerated and validated OK, superseding the
+  earlier analyzer-blocked refresh.
+
+All evidence is offline/local; the disposable Ubuntu/VPS gate has not run.
+Validation owner: orchestrator.
+
+## 2026-08-25 — Ponytail W4-11 / W1-03 local validation status
+
+Docs-only pass; no source, test, or ADR changes here.
+
+- W4-11 (installer source identity): local installer shell tests passed —
+  `bash tests/installer-idempotency.sh` and `bash tests/installer-payload.sh`,
+  both exit 0 (offline checks on a non-Linux host). The disposable Ubuntu/VPS
+  install gate is still pending; no live host was exercised.
+- W1-03 (`_current_paths()` exported once from `settings.py`):
+  `pytest tests/test_registry.py tests/test_events.py -q` — 27 passed,
+  offline. Broader suite runs remain with the orchestrator.
+- CodeDebrief refresh is blocked by an unavailable analyzer; the existing
+  `codedebrief-out/` artifacts were not regenerated.
+
+Validation owner: orchestrator.
+
 ## 2026-08-23 — Managed panel-edge UFW rule
 
 Implemented panel-edge firewall convergence. Wpfy dynamically discovers the

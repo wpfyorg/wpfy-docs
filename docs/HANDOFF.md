@@ -8,6 +8,36 @@
 - Relevant command docs in `docs/commands/`
 
 ## Current State
+- 2026-08-25 ponytail W1 mechanical batches completed, local evidence only
+  (validation owner: orchestrator): W1-02 `contextlib.suppress(X)`
+  conversions across `site_layout.py`, `site_security.py`, `panel_auth.py`,
+  `fail2ban_docker.py`, `fail2ban_host.py` — suppression pytest 524 passed.
+  W1-07 `Path.unlink(missing_ok=True)` conversions (dir-fd no-follow sites
+  untouched) — unlink-batch pytest 217 passed. W1-10 `smtp.py` TLS vocabulary
+  derived via `typing.get_args(TLSMode)`, Literal order and error text
+  preserved — 4 passed. W1-03 tranche two: remaining modules import the
+  shared lazy `current_paths()` from `settings.py`, per-module
+  `_current_paths` aliases kept for tests — path-access tests 86 passed.
+  CodeDebrief artifacts regenerated and validated OK.
+- 2026-08-25 ponytail batches (validation owner: orchestrator): W4-11
+  installer source identity — local shell tests pass
+  (`tests/installer-idempotency.sh`, `tests/installer-payload.sh`), and the
+  disposable Ubuntu/VPS install gate completed 2026-08-25: the full staged
+  installer ran end-to-end twice; the corrected failure-rollback probe exits
+  97 after a forced staged-source install failure; the `/opt/wpfy/app`
+  symlink was identical before and after the failed run
+  (`/opt/wpfy/releases/legacy-20260825013714-2557/app`); and `wpfy
+  --version` runs after the failure. Prior cleanup-trap defects (empty-variable
+  `[[ -n ]] && rm` cleanup returning non-zero under trap) were corrected in
+  both `wpfy` and `install.sh` and covered by the idempotency test. No
+  independent installer review was performed. The full offline suite passed
+  afterwards: `pytest -q` exit 0, 2277 passed in 649.22s, after a test-only
+  fixture correction in `tests/test_edge_backup.py` (the transaction-lock
+  case now uses the tmp state dir via frozen-dataclass replacement;
+  targeted rerun 4 passed). Root/Docker-mutating shell tests were not run.
+  W1-03 `_current_paths()` export — registry/events pytest 27 passed
+  offline. CodeDebrief artifacts were regenerated and validated OK,
+  superseding this pass's earlier analyzer-blocked refresh.
 - 2026-08-25 decision batch (docs only; no source or test changes, nothing
   implemented or validated): Quantum stays disabled/parked through 1.0 stable
   and is reassessed at 1.1 planning with no code deletion (ADR 0031 amended);
