@@ -1,5 +1,122 @@
 # Decision Log
 
+## 2026-08-25: Park FileBrowser Quantum through 1.0 stable
+- Decision: The FileBrowser Quantum file-manager integration remains disabled
+  and parked through 1.0 stable. Reassessment happens at 1.1 planning. No code
+  is deleted: `file_manager_providers/quantum.py`, `deploy/file-manager/`, the
+  pinned image lock, and the `WPFY_FM_ENABLED`/`WPFY_FM_LEGACY_API` flags stay
+  in the tree exactly as shipped. Recorded as an amendment to ADR 0031.
+- Owner: Product maintainer.
+- Target: No promotion in any 1.0 release; reassess at 1.1 planning.
+- Reason: The integration is implemented but unpromoted (`WPFY_FM_ENABLED`
+  defaults off). Promoting it inside the 1.0 stabilization window would add an
+  unaudited-at-scale surface to a release whose goal is stability, while
+  deleting it would discard reviewed, digest-pinned, rollback-capable work for
+  no gain.
+- Alternatives: promote in 1.0 (rejected: stabilization window); delete the
+  code (rejected: loses pinned, security-reviewed work and its rollback lane).
+- Compatibility: no operator-visible change; the legacy file-manager API
+  remains the default path.
+- Migration: none while the feature stays parked.
+- Rollback: unchanged from ADR 0031 — previous release plus the legacy API;
+  the Quantum container is never reachable without the panel proxy.
+- Status: Accepted.
+
+## 2026-08-25: Schedule WordPress Multisite for 1.1 with both modes
+- Decision: Multisite is scheduled for 1.1 with both subdirectory and
+  subdomain modes. Subdomain mode requires a Cloudflare DNS wildcard record
+  and a passing wildcard TLS preflight before any mutation. The product must
+  disclose that a network's child sites share one WPFY site runtime and one
+  database, while separately managed WPFY sites remain isolated from each
+  other as today. Implementation is blocked pending offline and disposable-VPS
+  evidence. Recorded as ADR 0035.
+- Owner: Product maintainer.
+- Target: WPFY 1.1.
+- Reason: Recurring operator demand for both network modes. Subdomain mode
+  cannot be supported honestly without the wildcard DNS and wildcard TLS
+  preconditions, and the shared-runtime disclosure keeps the isolation
+  guarantee from being overstated.
+- Alternatives: ship in 1.0 (rejected: stabilization window, no runtime
+  evidence); subdirectory-only (rejected: forces a disruptive second
+  migration later); present network children as isolated sites (rejected:
+  false).
+- Compatibility: additive in 1.1; single-site behavior and per-WPFY-site
+  isolation are unchanged.
+- Migration: none defined yet; converting an existing single site into a
+  network, if supported at all, is part of the 1.1 design.
+- Rollback: nothing implemented to roll back; a future implementation must
+  define rollback for partially provisioned networks before it ships.
+- Status: Accepted (scheduling); implementation blocked on evidence.
+
+## 2026-08-25: Confirm 1.0 scope for telemetry, SMTP, and named S3 storage
+- Decision: For 1.0, telemetry stays inert by default — nothing is sent unless
+  an endpoint is deliberately configured, and `WPFY_TELEMETRY=0` still
+  overrides state. SMTP stays test-only: a stored transport plus explicit test
+  sends, never automatic notifications. Named S3-compatible backup storage
+  profiles remain CLI-only. This decision pins existing behavior for the 1.0
+  scope; no source change is made by it. Telemetry design stands as ADR 0026.
+- Owner: Product maintainer.
+- Target: WPFY 1.0.
+- Reason: Each surface already behaves the way the product wants for 1.0;
+  recording the scope prevents accidental expansion (automatic alerting,
+  outbound telemetry delivery, or a parallel storage-configuration surface)
+  during stabilization.
+- Alternatives: automatic SMTP notifications (rejected, again: a shared
+  credential readable by any site's PHP cuts against site isolation);
+  enabling telemetry delivery (rejected: no endpoint configured and the opt-out
+  payload discipline of ADR 0026 stands); moving named S3 profiles out of the
+  CLI (deferred; not 1.0 scope).
+- Compatibility: no interface changes; all three surfaces behave exactly as
+  shipped.
+- Migration: none.
+- Rollback: none needed; behavior is unchanged.
+- Status: Accepted.
+
+## 2026-08-25: Flat CLI stays canonical; compatibility surfaces deprecate in 1.0
+- Decision: The flat command surface remains canonical. Grouped `wpfy site
+  ...`/`wpfy stack ...` compatibility surfaces and confirmed legacy removals
+  are deprecated in 1.0 and are not removed earlier than 1.1. Every removal
+  must ship with actionable migration guidance naming the replacement command,
+  published in the same release that removes the surface. Deprecation in 1.0
+  is a documented-status change; whether a surface also emits a runtime
+  warning is left to the implementing change.
+- Owner: Product maintainer.
+- Target: Deprecation recorded in 1.0; earliest removal in 1.1.
+- Reason: Operators and scripts need one canonical surface plus a predictable
+  runway. Removing compatibility aliases during stabilization would break
+  working automation without giving users time to migrate.
+- Alternatives: keep both surfaces indefinitely (rejected: permanent dual
+  maintenance and drift); remove grouped commands in 1.0 (rejected: breaks
+  automation inside a stabilization release).
+- Compatibility: nothing is removed in 1.0.
+- Migration: each removal pairs with a published command mapping before the
+  removal lands.
+- Rollback: re-adding a removed alias remains technically possible until the
+  parser stabilizes; the migration guidance is the primary recovery path.
+- Status: Accepted.
+
+## 2026-08-25: Deprecate `stack migrate`; remove in 1.1
+- Decision: `wpfy stack migrate` is deprecated in 1.0 and will be removed no
+  earlier than 1.1. The command was never implemented — Docker-first v1 has no
+  host-level stack to migrate from — so deprecation is a documented status
+  change, not a behavior change. The 1.1 removal must include actionable
+  guidance for operators coming from host-managed stacks.
+- Owner: Product maintainer.
+- Target: Deprecated in 1.0; removed no earlier than 1.1.
+- Reason: The Docker-first architecture eliminated the problem the command
+  name promised to solve; keeping a permanently unimplemented placeholder in
+  the parser misleads operators scanning `wpfy stack --help`.
+- Alternatives: implement host-stack migration (rejected previously; out of
+  scope for the Docker-first product); keep the silent placeholder
+  indefinitely (rejected: misleading surface).
+- Compatibility: no behavior change in 1.0 — there is nothing to deprecate at
+  runtime; the parser entry goes away in 1.1 alongside the guidance.
+- Migration: operators on host-level stacks are directed to the Docker-first
+  install path; the 1.1 removal notes must state this explicitly.
+- Rollback: restoring the placeholder after removal has no value; removal is
+  final absent new product direction.
+- Status: Accepted.
+
 ## 2026-08-21: Traefik reads Docker through an allowlisted socket proxy
 - Decision: Traefik no longer mounts `/var/run/docker.sock`. A digest-pinned
   `wollomatic/socket-proxy` holds the socket on a new `internal: true`

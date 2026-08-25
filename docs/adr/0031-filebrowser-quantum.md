@@ -1,6 +1,7 @@
 # ADR 0031: Adopt the FileBrowser Quantum fork for the per-site file manager
 
-- Status: Accepted (implemented)
+- Status: Accepted (implemented); amended 2026-08-25 — parked and disabled
+  through 1.0 stable, reassessed at 1.1 planning
 - Date: 2026-08-06
 - Deviation note: the 2026 panel-audit remediation plan referenced ADR 0024 for
   this decision, but 0024 and 0025 are already taken
@@ -80,3 +81,18 @@ X-Forwarded-User`) with the panel as the ONLY ingress. Deployment shape
 - Release artifacts for the chosen image live in `deploy/file-manager/`
   (`image.lock`, `compose.fragment.yaml`, `config.template.yaml`, `SBOM.txt`,
   `LICENSE.txt`, `SECURITY.md`, `config.generated.yaml`).
+
+## Amendment 2026-08-25: parked through 1.0 stable
+
+Product decision (owner: product maintainer): Quantum remains disabled and
+parked through 1.0 stable and is reassessed at 1.1 planning. No code is
+deleted — the provider, deploy artifacts, image lock, and the
+`WPFY_FM_ENABLED`/`WPFY_FM_LEGACY_API` flags stay in the tree exactly as
+shipped. Nothing above is retracted; promotion simply does not happen in any
+1.0 release.
+
+- Compatibility: no operator-visible change; the legacy file-manager API
+  remains the default path.
+- Migration: none while the feature stays parked.
+- Rollback: unchanged — previous release plus the legacy API; the Quantum
+  container is never reachable without the panel proxy.

@@ -8,6 +8,18 @@
 - Relevant command docs in `docs/commands/`
 
 ## Current State
+- 2026-08-25 decision batch (docs only; no source or test changes, nothing
+  implemented or validated): Quantum stays disabled/parked through 1.0 stable
+  and is reassessed at 1.1 planning with no code deletion (ADR 0031 amended);
+  Multisite is scheduled for 1.1 with both modes and is blocked pending
+  offline/VPS evidence — subdomain mode requires a Cloudflare DNS wildcard
+  plus a passing wildcard TLS preflight before any mutation, and children must
+  be disclosed as sharing one WPFY site runtime/database while WPFY sites stay
+  isolated (ADR 0035); telemetry stays inert-by-default, SMTP test-only, and
+  named S3 storage CLI-only for 1.0; flat CLI remains canonical with grouped
+  compatibility surfaces and confirmed legacy removals deprecating in 1.0 and
+  removable no earlier than 1.1 with actionable migration; `stack migrate`
+  deprecates in 1.0 and removes in 1.1.
 - The first panel administrator now comes from a run-token-authorized browser wizard. Setup routes return HTTP 410 after creation, edge-bound setup is refused, verified TOTP or an explicit skip completes the flow, and anonymous telemetry remains inert until an endpoint is configured. `wpfy telemetry status` prints the exact seven-field payload; see ADRs 0025 and 0026.
 - The repo has a runnable Python CLI and Ubuntu installer for Docker-backed WordPress/server administration.
 - Phase F bounds SSL discovery, Docker health inspection, and no-op registry writes. Local proof covers exact parser/opener/inspect/write counts plus full regression; real disposable-VPS timing remains optional and deferred.

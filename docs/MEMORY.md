@@ -182,6 +182,14 @@
 - Registry and `.env` both store `PHP_VERSION`.
 
 ## Planned / Deferred
+- WordPress Multisite (scheduled 1.1, ADR 0035): both subdirectory and
+  subdomain modes; subdomain requires a Cloudflare DNS wildcard record plus a
+  passing wildcard TLS preflight before any mutation; network children share
+  one WPFY site runtime/database and the product must disclose that, while
+  separately managed WPFY sites remain isolated. Implementation blocked
+  pending offline and disposable-VPS evidence. Nothing implemented yet.
+- FileBrowser Quantum (ADR 0031, amended 2026-08-25): stays disabled/parked
+  through 1.0 stable; reassess at 1.1 planning; no code deletion.
 - Remediate remaining security audit findings: Traefik socket risk reduction, WP-CLI artifact verification, explicit non-root users/read-only root filesystems where compatible, and live execution of the disposable-VPS validation flow.
 - Additional DNS providers for wildcard SSL.
 - Additional ACME challenge/provider support beyond the implemented direct TLS-ALPN-01, Cloudflare-proxied HTTP-01, and Cloudflare DNS wildcard flows.
@@ -213,6 +221,19 @@
 - VitePress docs preview convention: from the docs repository, use `npm run docs:preview -- --host 127.0.0.1 --port 4173` after `npm run docs:build`.
 
 ## Latest Decisions
+- 2026-08-25: Quantum stays disabled/parked through 1.0 stable, reassessed at
+  1.1 planning; no code deleted. ADR 0031 amended.
+- 2026-08-25: Multisite scheduled for 1.1 with both modes (ADR 0035);
+  subdomain requires Cloudflare DNS wildcard plus a passing wildcard TLS
+  preflight before any mutation; children share one WPFY site runtime/database
+  and this is disclosed while WPFY sites stay isolated from each other;
+  implementation blocked pending offline/VPS evidence.
+- 2026-08-25: 1.0 scope confirmed — telemetry inert-by-default, SMTP
+  test-only, named S3-compatible storage CLI-only.
+- 2026-08-25: Flat CLI canonical; grouped compatibility surfaces and confirmed
+  legacy removals deprecate in 1.0 and are removed no earlier than 1.1, each
+  with actionable migration guidance.
+- 2026-08-25: `stack migrate` deprecated in 1.0, removed in 1.1.
 - 2026-08-05: F2 limits forwarded client and scheme trust to inspected Traefik addresses, then refreshes managed sites after edge start; see ADR 0016.
 - 2026-07-19: RC2 local release gates passed for app commit `5c90ad2`; final
   promotion remains blocked on public-artifact and disposable-VPS evidence.
