@@ -38,11 +38,12 @@ file is backed up before the first write. `wpfy stack install` writes it;
 the host. The command tells the operator to run `systemctl restart docker`
 themselves, and says what it costs.
 
-**3. Every claim of IPv6 protection is gated on the _running_ daemon, never on
-the file wpfy just wrote.** Because (2) leaves a window where the file says
-enabled and the daemon it describes still has IPv6 off, `daemon_ipv6_active()`
-inspects the live default `bridge` network. Anything unknown — no Docker, no
-permission, timeout, junk output — answers "not active".
+**3. Every claim of IPv6 protection is gated on the _running_ daemon and both
+shared edge networks, never on the file wpfy just wrote.** Because (2) leaves a
+window where the file says enabled and the daemon it describes still has IPv6
+off, `daemon_ipv6_active()` inspects the live default `bridge`, `wpfy`, and
+`wpfy-panel-edge` networks. Anything unknown — no Docker, no permission,
+timeout, missing network, junk output — answers "not active".
 
 **4. All wpfy IPv6 subnets are `/64`s carved from one ULA prefix,
 `fd4a:3b1c::/48`** (pseudo-random per RFC 4193). The 48→64 split leaves a 16-bit
@@ -60,10 +61,11 @@ disconnects every attached container. `wpfy stack ipv6-migrate --force` is the
 only sanctioned path: it stops Traefik, recreates the edge networks, and starts
 it again, disclosed as a maintenance window that takes every site offline.
 
-**7. wpfy's own IPv6 addresses are never bannable.** `fc00::/7` and the `::`
-sentinel join the never-ban set in the panel and in the WordPress bridge's
-in-container `REMOTE_ADDR` redaction, mirroring the existing `172.16.0.0/12`
-and `0.0.0.0` handling on the IPv4 side.
+**7. WPFY infrastructure IPv6 addresses are never bannable.** The WPFY
+`fd4a:3b1c::/48` prefix, discovered edge endpoints, and the `::` sentinel join
+the never-ban set in the panel and in the WordPress bridge's in-container
+`REMOTE_ADDR` redaction. The wider `fc00::/7` is deliberately excluded:
+unrelated operator Docker networks and routed ULA clients remain bannable.
 
 ## Alternatives considered
 
@@ -102,10 +104,9 @@ and `0.0.0.0` handling on the IPv4 side.
   exposure with it; it now selects by address family (v4 preferred for the host
   bind and the ufw rule, v6-only networks still resolve). Two configs of the
   *same* family remain ambiguous and are still refused.
-- ULA sources are never-ban, so an attacker who can originate from inside a
-  wpfy Docker network is unbannable by this mechanism. That is already true on
-  the IPv4 side and is accepted: reaching that position means container escape,
-  which this control does not model.
+- WPFY ULA sources and discovered edge endpoints are never-ban. Unrelated ULA
+  sources are bannable, so an operator-created Docker network or routed ULA
+  client cannot evade this control merely through address family selection.
 - **Unproven live.** Everything above is covered by offline tests only. A green
   offline suite stubs `subprocess.run` and cannot show that the daemon accepts
   the merged `daemon.json`, that an IPv6 ban drops a packet (it previously sat
