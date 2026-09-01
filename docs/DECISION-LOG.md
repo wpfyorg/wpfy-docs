@@ -637,6 +637,69 @@
 - Consequence: Operators restart Docker once, at a time they choose, before enforcement is real; until then fail2ban status reports IPv6 degraded and names the reason. Pre-existing stacks keep IPv4-only edge networks until `ipv6-migrate --force`. Enabling IPv6 on `wpfy-panel-edge` makes Docker report two IPAM configs; `panel_edge_network_facts` required exactly one and would have hard-failed, taking `edge_bind_address` and domainless panel exposure with it — it now selects by address family, and two configs of the same family are still refused. An unrelated operator or routed ULA source is bannable; WPFY prefix and discovered edge endpoints are not. Offline tests only: the daemon accepting the merged config, an IPv6 ban dropping a packet, and Traefik reporting a real IPv6 client address all belong to the validation-day gate and are not claimed.
 - Status: Accepted.
 
+## 2026-09-01: IPv6 edge enforcement live-validated on Docker 29.7.2; the historical userland-relay finding is Docker-version-specific, not universal
+- Decision: ADR 0036's status moves from "unproven" to live-validated with a retained
+  exception. The 2026-08-26 entry's "offline tests only" consequence is superseded by
+  measured evidence from validation day, recorded in the WPFY repo at
+  `docs/release-evidence/ipv6-validation-2026-09-01/` (phases 0, 1–2, 3, 4). The
+  historical finding that inbound IPv6 was relayed by `docker-proxy` in userland and sat
+  at 0 packets is corrected to be Docker-version-specific: on Docker 29.7.2 (Ubuntu
+  24.04, Box A/B dual-stack) it did NOT reproduce — IPv6 REJECT rules matched real
+  external traffic while the running daemon still reported IPv6 off (manual pre-restart
+  ban: 2 packets counted, `curl -6` blocked), and the post-restart organic ban's counter
+  rose 0→2 before unban. The ADR keeps the daemon-gated claim design unchanged; on this
+  Docker version the gate is conservative rather than over-claiming.
+- Validation outcomes (2026-09-01, clean archive of WPFY HEAD `b74eb51`, wpfy 1.0.0rc8,
+  real Let's Encrypt certificates over both address families, strict external
+  verification verify=0):
+  - Claim 1 (IPv6 ban blocks a real external client) PASS: organic trigger only — 5 real
+    failed wp-login POSTs auto-banned Box B's global IPv6; during ban `curl -6` was
+    refused (icmp6 port-unreachable), chain counter rose 0→2 packets, IPv4 stayed 200;
+    `unbanip` restored strict v6 200. SSH untouched: iptables/ip6tables INPUT empty,
+    fail2ban hooks live only in DOCKER-USER.
+  - Claim 2 (real IPv6 client identity end-to-end) PASS: access-log field 1 = the
+    external client's own global IPv6, never the gateway; `X-Forwarded-For` spoof
+    defeated; Traefik edge v6 `/128` discovery and per-site `set_real_ip_from` rendered
+    and live; dual-IPAM `panel_edge_network_facts` and single parseable
+    `_network_gateway` behave as designed; a real failed WP login keyed on the true v6.
+  - Claim 3 (IPv6 migration) PARTIAL: daemon merge preserves operator keys, backs up
+    before first write, and refuses unparseable JSON (exit 1, file untouched); a full
+    Docker restart outage measured 36.7 s with complete auto-recovery; no-force migrate
+    refuses with exit 2 and zero mutation; forced migrate caused a measured 2.1 s
+    user-visible outage and is idempotent. NOT proven: the `stack install` exit-3
+    refusal of still-IPv4-only edge networks — Docker 29.7.2 created both edge networks
+    dual-stack at initial creation, so `_network_ipv6_mismatch` never fired; the branch
+    exists in source but is unproven and was not reproducible on this stack.
+  - Claim 4 (runtime hardening) PASS: `RUN_DOCKER_RUNTIME_HARDENING=1 bash
+    tests/docker-runtime-hardening.sh` → failures=0 skips=0 including socket-proxy POST
+    mutation refusal (HTTP 405) and neighbour-network healthz 403; `docker-hardening.sh`
+    and `exposed-ports.sh` exit 0; `wpfy secure --all` PASS against the running
+    dual-stack. Inspect representation quirk recorded separately: compose writes
+    `cap_drop: [ALL]`, Docker 29.7.2 stores it literally, so grepping inspect output for
+    NET_RAW finds nothing although NET_RAW (bit 27, 0x08000000) is effectively dropped
+    (process CapEff = 0); `wpfy secure` matches via the ALL branch.
+- Residual gaps recorded honestly: (1) the panel-edge real-IPv6-bind branch
+  (`validate_panel_edge_bind`'s IPv6 path, domainless panel exposure bound to a real v6
+  edge address) was not exercised live; (2) wpfy exposes no operator ban CLI
+  (`security` is status/repair/test/unban only), so the never-ban guarantee is proven
+  only emission-side (bridge mu-plugin redaction of `fd4a:3b1c::/48` to a rejected
+  sentinel); a manual `fail2ban-client banip` bypasses wpfy and produced no blackhole.
+  The redaction check is NOT claimed as an operator ban rejection.
+- Reason: the 2026-08-26 consequences were written before any host evidence; validation
+  day produced contradicting measurement for one historical claim (userland relay) and
+  confirming measurement for the enforcement design, so the ADR must carry both rather
+  than let a version-specific observation stand as a universal one.
+- Alternatives considered: keeping "unproven" status until a host with an older
+  engine could be reproduced (rejected: leaves correct, measured behaviour
+  mislabeled; the 2026-08-21 host's engine version was not recorded, so a
+  reproduction attempt cannot be scoped); deleting the historical finding
+  (rejected: it is an accurate record of what the 2026-08-21 host's engine did,
+  and remains potentially true for engines other than the validated 29.7.2 —
+  untested, not asserted).
+- Compatibility: no operator-visible behaviour change; documentation-only amendment.
+- Migration: none.
+- Rollback: revert the ADR amendment; the 2026-08-26 decision itself is unchanged.
+- Status: Accepted (amendment to ADR 0036; validation evidence, no new product decision).
 ## 2026-09-01: PHP-FPM pool sizing is host-derived and delivered as a second `[www]` pool override
 - Decision: Generate a per-site `php/zz-wpfy-pool.conf` (bind-mounted read-only into the app service) that re-declares the `[www]` pool, loaded after the upstream `php:*-fpm` image's stock pool files so the generated section extends rather than replaces the image's pool — wpfy's directives win while the stock listen socket and nginx upstreams stay untouched. The pool runs `pm=ondemand`; the app memory limit is `min(96 MB × 4 × host CPU count, 40% of host RAM)` with a 512m floor and no artificial maximum, `pm.max_children` derives from that limit (96 MB per worker), and the CPU quota equals the host CPU count with no artificial cap. Worked values: 2 vCPU / 2468 MB → 768m / 2.00 / 8 workers; 8 vCPU / 16 GB → 3072m / 8.00 / 32; 1 vCPU / 1 GB → 512m (floor) / 1.00 / 5. The generated file's header points operators at `php/pool-custom.conf`, mounted after the generated override; regeneration never rewrites operator content. The WP-CLI service does not mount either FPM pool file — only the app service runs the pool. Existing sites migrate via `wpfy refresh all --restart`, which regenerates scaffolds and recreates each site's app and web containers sequentially — a brief per-site 502 window per site, disclosed as such. See ADR 0038.
 - Reason: The five-platform benchmark showed wpfy collapsing under uncached plugin-heavy load while Webinoly and CloudPanel did not. The follow-up analysis (`runcloud-audit/perf/FPM-SIZING-PLAN.md`) attributed survival to capacity headroom vs. arrival rate, not pool mode, and found wpfy's PHP tier bounded by three constants: `pm.max_children=5` inherited by accident from the upstream image's development default, a hardcoded `1.00`-core CPU cap (half the machine on the 2-vCPU benchmark host — the dominant term, missed in the benchmark write-up), and a fixed `512m` memory limit. `ondemand` was chosen over `dynamic` specifically because wpfy runs one pool per site: dynamic's resident spare servers multiply idle workers (and idle RSS) by site count, while `ondemand` holds no workers on an idle site and still reaches the full host-derived ceiling under load.

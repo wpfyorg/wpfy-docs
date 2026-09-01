@@ -8,6 +8,28 @@
 - Relevant command docs in `docs/commands/`
 
 ## Current State
+- 2026-09-01 IPv6 validation day completed (validation owner: parent; ADR 0036
+  amended): clean install from the WPFY HEAD `b74eb51` archive (wpfy 1.0.0rc8,
+  Ubuntu 24.04, Docker 29.7.2, Box A 13.207.69.203 + Box B 3.110.143.170,
+  dual-stack edge networks, real Let's Encrypt certificates over both address
+  families with strict external verify=0). Claims 1 (organic IPv6 ban blocks a
+  real external v6 client, chain counter 0→2, v4 unaffected) and 2 (real client
+  IPv6 identity end-to-end, XFF spoof defeated) PASS. Claim 4 (runtime
+  hardening) PASS: `tests/docker-runtime-hardening.sh` failures=0 skips=0 with
+  socket-proxy POST-mutation refusal 405 and neighbour healthz 403, plus
+  `docker-hardening.sh`, `exposed-ports.sh` exit 0 and `wpfy secure --all`
+  PASS. Claim 3 (migration) PARTIAL: merge/backup/invalid-JSON refusal,
+  36.7 s restart auto-recovery, no-force refusal (zero mutation), and a 2.1 s
+  idempotent forced migrate are proven; the `stack install` exit-3 IPv4-only
+  edge-network refusal is unproven and not reproducible on Docker 29 (edge
+  networks were created dual-stack at initial creation). The historical
+  userland-relay IPv6 finding is corrected as Docker-version-specific — it did
+  not reproduce on Docker 29.7.2 (pre-restart manual ban already counted 2
+  packets and blocked v6; organic ban counter 0→2). Residual gaps recorded
+  honestly: the panel-edge real-IPv6-bind branch was not exercised live, and
+  wpfy has no operator ban CLI, so the never-ban guarantee is emission-side
+  redaction only (not an operator ban rejection). Evidence: WPFY repo
+  `docs/release-evidence/ipv6-validation-2026-09-01/`.
 - 2026-08-26 v1 readiness assessed and IPv6 enforcement started (validation
   owner: orchestrator). **Not v1-taggable yet.** Three gates, per `TODO.md`
   (2026-08-21) and `ROADMAP.md`'s own "Near-term (v1 gates)": (1) nothing at
@@ -197,18 +219,13 @@
 - Do not attempt ACME issuance unless DNS/IP preflight passes.
 
 ## Recommended Next Step
-- Finish `feat/ipv6-enforcement` in two dispatches, not one — the 6h timeout at
-  ~40% means the remainder does not fit in a single run. First: fix the two open
-  defects (registry-allocated ULA replacing the hash; `daemon_ipv6_active()`
-  reading the live daemon), repair
-  `tests/test_stack.py::test_install_reports_traefik_and_helper_failures` for
-  the new docker-ipv6 fact, add the missing tests including the ULA-uniqueness
-  proof, and add `ipv6-migrate`. Second: stage 3 plus ADR 0036 and the
-  DECISION-LOG entry. Raise `GPT_AGENT_TIMEOUT` and set
-  `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000` on both.
-- Reauthenticate the Codex account behind `gpt-5.6-sol` before the IPv6 branch
-  is ready for review; luna is the wrong tier for a security review and is the
-  only working fallback today.
+- IPv6 residuals from 2026-09-01 (ADR 0036 retained exception): exercise the
+  `stack install` IPv4-only edge-network refusal (exit 3) on a host whose edge
+  networks predate dual-stack creation, and exercise the panel-edge
+  real-IPv6-bind branch live; both are unproven, not claimed. Decide whether an
+  operator ban CLI is wanted — today the never-ban guarantee exists only
+  emission-side (bridge mu-plugin redaction) and a manual `fail2ban-client
+  banip` bypasses wpfy.
 - Do not tag `v1.0.0` off an unverified HEAD. Cut `v1.0.0-rc8` (bump
   `1.0.0rc7` → `1.0.0rc8` in `pyproject.toml` and `src/wpfy/__init__.py`; rc7
   was prepared but never tagged, so skip rather than backfill it), publish it,

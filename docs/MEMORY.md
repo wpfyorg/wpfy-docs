@@ -5,6 +5,32 @@
 - Target install UX: `curl -fsSL https://raw.githubusercontent.com/wpfyorg/wpfy/main/install.sh | sudo bash`.
 
 ## Implemented
+- IPv6 edge enforcement live-validated (2026-09-01, ADR 0036 amended; validation
+  owner: parent). Clean install from the WPFY HEAD `b74eb51` archive: wpfy
+  1.0.0rc8, Ubuntu 24.04, Docker 29.7.2, Box A/B dual-stack edge networks
+  (`fd4a:3b1c:0:1::/64`, `fd4a:3b1c:0:2::/64`), real Let's Encrypt certificates
+  over both families with strict external verify=0. Claim 1 PASS — organic IPv6
+  ban (5 real failed wp-login POSTs) blocked a real external v6 client
+  (icmp6 port-unreachable, chain counter 0→2 packets, IPv4 200 unaffected,
+  unban restored v6 200; INPUT chains untouched, hooks live only in
+  DOCKER-USER). Claim 2 PASS — access log and WP-CLI failures key the external
+  client's real global v6; XFF spoof defeated; Traefik v6 /128 edge discovery
+  and per-site `set_real_ip_from` live; dual-IPAM `panel_edge_network_facts`
+  and `_network_gateway` single parseable addresses behave as designed. Claim 3
+  PARTIAL — merge preserves operator keys, backs up, refuses invalid JSON
+  (exit 1); restart outage 36.7 s full auto-recovery; no-force refusal exit 2
+  with zero mutation; forced migrate 2.1 s outage, idempotent; the `stack
+  install` exit-3 IPv4-only edge-network refusal is unproven and not
+  reproducible on Docker 29 (networks born dual-stack). Claim 4 PASS —
+  `tests/docker-runtime-hardening.sh` failures=0 skips=0 (socket-proxy POST 405
+  refusal, neighbour healthz 403), `docker-hardening.sh`/`exposed-ports.sh`
+  exit 0, `wpfy secure --all` PASS. Historical userland-relay finding corrected
+  as Docker-version-specific: on Docker 29.7.2 IPv6 REJECT rules matched real
+  traffic even pre-restart (manual ban counted 2 packets, curl -6 blocked).
+  Residuals: panel-edge real-IPv6-bind branch unexercised; no operator ban CLI
+  — never-ban guarantee is emission-side redaction only, not an operator ban
+  rejection. Evidence: WPFY repo
+  `docs/release-evidence/ipv6-validation-2026-09-01/`.
 - Host-derived PHP-FPM pool sizing (2026-09-01, docs scope; validation
   owner: orchestrator): every managed site now generates
   `php/zz-wpfy-pool.conf` — a second `[www]` pool section loaded after the
@@ -351,6 +377,14 @@
 - VitePress docs preview convention: from the docs repository, use `npm run docs:preview -- --host 127.0.0.1 --port 4173` after `npm run docs:build`.
 
 ## Latest Decisions
+- 2026-09-01: IPv6 edge enforcement live-validated on Docker 29.7.2 (ADR 0036
+  amended; claims 1/2/4 PASS, claim 3 PARTIAL with the stack-install exit-3
+  IPv4-only edge-network refusal retained as unproven); the historical
+  userland-relay IPv6 finding corrected as Docker-version-specific — it did not
+  reproduce on Docker 29 (organic v6 ban counter 0→2 before/after restart).
+  Residuals kept honest: panel-edge real-v6 bind unexercised, and no operator
+  ban CLI (emission-side redaction only, never claimed as operator ban
+  rejection).
 - 2026-09-01: Production SMTP alerting deferred to v1.1 (ADR 0037); planned
   direction global SMTP config with per-site propagation; secrets
   storage/isolation design deferred to an implementation ADR; production SMTP

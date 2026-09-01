@@ -1,5 +1,81 @@
 # Worklog
 
+## 2026-09-01 — IPv6 validation day on Box A/B (ADR 0036 amended)
+
+Validation pass, docs-only (this worktree and the WPFY evidence dir; no source
+changes anywhere). Validation owner: parent. Raw transcripts live in the WPFY
+repo at `docs/release-evidence/ipv6-validation-2026-09-01/` — phase-0
+pre-migration, phase-1-2 client identity and ban, phase-3 IPv6 migration,
+phase-4 runtime hardening, each with a SUMMARY.md.
+
+- Stack: clean install from the WPFY HEAD `b74eb51` archive (sha-verified
+  before install; wpfy 1.0.0rc8), Box A 13.207.69.203 + Box B 3.110.143.170,
+  Ubuntu 24.04 (kernel 6.17.0-1019-aws), Docker 29.7.2 / Compose v5.5.0. Both
+  sites hold real Let's Encrypt certificates; external strict HTTPS verified
+  over IPv6 and IPv4 (verify=0, LE YR1/YR2, notAfter 2026-11-30). ACME issuance
+  was initially blocked by an AWS security group (443/tcp IPv4 only; IPv6 443
+  was open) — resolved same day by the parent, then two ACME orders completed
+  after a Traefik *container* restart; no daemon restart, no CA switch, no
+  workaround. Pre-migration manual v6 ban already rejected real traffic on
+  Docker 29.
+- Claim 2 (client identity) PASS: site-A nginx access-log field 1 was Box B's
+  exact global v6 (`2406:da1a:284:ef00:9c3f:1fd4:e61d:9139`), not
+  `172.18.0.1`; an `X-Forwarded-For: 2001:db8::dead` spoof was defeated;
+  Traefik edge discovery emitted v6 `/128`s and per-site `set_real_ip_from`
+  matched; `panel_edge_network_facts` handled dual IPAM and `_network_gateway`
+  parsed single addresses; a real failed WP login logged the true v6.
+- Claim 1 (ban enforcement) PASS organically: five real failed wp-login POSTs
+  from B auto-banned its v6 (no manual `banip`); during the ban `curl -6`
+  failed in ~0 ms with icmp6 port-unreachable while `curl -4` stayed 200
+  verify=0; the DOCKER-USER REJECT counter rose 0→2 packets; `unbanip` exit 0
+  restored strict v6 200. SSH safety held throughout: INPUT chains empty on
+  both families, fail2ban hooks only in DOCKER-USER, sshd jail 0 bans.
+- Claim 3 (migration) PARTIAL, as specified: daemon.json merge preserved the
+  operator key, seeded a wpfy backup, refused invalid JSON (exit 1, file
+  byte-identical); full Docker restart outage measured 36.7 s with complete
+  auto-recovery (all containers self-started, no intervention); no-force
+  migrate refused exit 2 with zero mutation (identical network IDs and
+  container list); forced migrate ran with a measured 2.1 s user-visible
+  outage (one dropped sample + one 404) vs the 36.7 s restart, and a second
+  forced run was idempotent ("already has IPv6 topology"). NOT proven: the
+  `stack install` exit-3 refusal of still-IPv4-only edge networks — Docker 29
+  created both edge networks dual-stack at initial creation, so the mismatch
+  branch never fired; recorded as a prior-state deviation, not a pass.
+  External healthz.html answers 403 by site config; 403 was used consistently
+  as the availability baseline across both outage measurements.
+- Claim 4 (runtime hardening) PASS from the clean installed source tree
+  (fresh extraction of the same `b74eb51` archive, 5-file sha256 spot-check
+  identical; `/opt/wpfy` carries no `tests/`, so extraction was required):
+  `RUN_DOCKER_RUNTIME_HARDENING=1 bash tests/docker-runtime-hardening.sh`
+  reported RESULT failures=0 skips=0 — socket-proxy POST mutation refused
+  (HTTP 405), neighbour-network healthz 403, /version//containers/json//events
+  200 from Traefik, container-local healthz ok; `docker-hardening.sh` and
+  `exposed-ports.sh` exit 0 with zero [FAIL]; `wpfy secure --all` result PASS.
+  Disposable compose projects cleaned up fully; live stack untouched (docker
+  service never restarted; same 8 containers healthy). Inspect NET_RAW
+  representation quirk recorded separately: compose writes `cap_drop: [ALL]`,
+  Docker 29.7.2 keeps it literal, so inspect never shows the literal NET_RAW
+  although bit 27 (0x08000000) is effectively dropped — process CapEff = 0
+  everywhere except Traefik's 0x400; `wpfy secure` matches via the ALL branch.
+- Historical correction, recorded as fact: the 2026-08-21 finding that inbound
+  IPv6 was userland-relayed and bans sat at 0 packets is
+  Docker-version-specific. On Docker 29.7.2 it did not reproduce in either
+  daemon state — a manual pre-restart ban counted 2 packets and blocked v6
+  (phase-0 evidence 28–31), and the organic post-restart ban counter rose 0→2
+  (phase-1-2 evidence 08–11). The daemon-gated protection claim is retained by
+  design; on this Docker version it is conservative (withholding a partly-true
+  claim), not over-claiming.
+- Residual gaps stated honestly: the panel-edge real-IPv6-bind branch
+  (`validate_panel_edge_bind` IPv6 path) was not exercised live; wpfy exposes
+  no operator ban CLI (security = status/repair/test/unban only), so the
+  never-ban guarantee was verified only emission-side — the bridge mu-plugin
+  redacts `fd4a:3b1c::/48` (plus sentinel/loopback/172.16/12) to `0.0.0.0`,
+  which the strict failregex rejects. A manual fail2ban-native `banip`
+  (labelled MANUAL, bypassing wpfy) listed in the jail but produced no
+  blackhole; this is not claimed as an operator ban rejection.
+- Scope kept: Box A/B and the WPFY evidence dir only on the WPFY side; docs
+  edits only in the five allowed files in this clean worktree. Nothing
+  committed.
 ## 2026-09-01 — Docs pass: rc8 checklist alignment and SMTP alerting scope decision
 
 Documentation-only pass; no scripts or code changed. Validation owner:
