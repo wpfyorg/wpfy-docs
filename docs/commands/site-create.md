@@ -4,7 +4,7 @@
 Create a managed site using concise CLI flags and Docker/Compose-backed runtime resources.
 
 ## Status
-- Implemented: CLI parsing for site type flags, `-le`/`--letsencrypt`, and WordPress admin flags `--user`, `--email`, `--pass`.
+- Implemented: CLI parsing for site type flags, `-le`/`--letsencrypt`, and WordPress admin flags `--user`, `--email`, `--pass [-|prompt]`.
 - Implemented: idempotent per-site Compose generation for site, PHP, MySQL, Redis, Nginx, and WP-CLI services.
 - Implemented: runtime start attempt when Docker and Compose are available.
 - Implemented: DNS/IP SSL preflight before any site file changes when `-le`/`--letsencrypt` is requested.
@@ -23,7 +23,7 @@ Create a managed site using concise CLI flags and Docker/Compose-backed runtime 
 wpfy site create <domain> --wp
 wpfy site create <domain> --wp -le
 wpfy site create <domain> --wpredis
-wpfy site create <domain> --wp --user=admin --email=admin@example.com --pass='secret'
+wpfy site create <domain> --wp --user=admin --email=admin@example.com [--pass [-|prompt]]
 ```
 
 ## Examples
@@ -32,14 +32,34 @@ wpfy site create example.com --wp
 wpfy site create example.com --wp -le
 wpfy site create example.com --wpredis
 wpfy site create example.com --wp --user=admin
+# Non-interactive automation: read exactly one password line from stdin.
+printf '%s\n' "$WPFY_ADMIN_PASSWORD" | wpfy site create example.com --wp --pass -
 ```
+
+## Password Behaviour
+- Omitting `--pass` preserves the existing fresh-install behavior: wpfy generates
+  a password and prints it exactly once.
+- `--pass -` reads one password line from stdin for non-interactive automation.
+- `--pass prompt` (or `--pass` without a value) prompts only from a TTY.
+- Raw `--pass <password>` values are rejected with exit code 2 so passwords do
+  not appear in the process table.
 
 ## Expected Files Touched
 - Implemented: `/opt/wpfy/sites/<domain>/compose.yaml`.
 - Implemented: `/opt/wpfy/sites/<domain>/.env`.
 - Implemented: `/opt/wpfy/sites/<domain>/nginx/`, `/opt/wpfy/sites/<domain>/php/`, `/opt/wpfy/sites/<domain>/backups/`, and `/opt/wpfy/sites/<domain>/app/`.
 - Implemented: `/opt/wpfy/sites/<domain>/nginx/default.conf` and `/opt/wpfy/sites/<domain>/app/healthz.html`.
+- Implemented: `/opt/wpfy/sites/<domain>/php/zz-wpfy-pool.conf` — generated PHP-FPM `[www]` pool section, bind-mounted read-only into the app container and rewritten in place (never inode-swapped); sized host-derived per ADR 0038.
+- Implemented: `/opt/wpfy/sites/<domain>/php/pool-custom.conf` — operator override file (mounted after the generated pool), created/pointed to by the generated file's header and never rewritten by regeneration.
 - Implemented: registry metadata under `/var/lib/wpfy/sites.json`.
+
+## PHP-FPM Pool Sizing
+- Implemented: the site pool is generated as `php/zz-wpfy-pool.conf`, a second `[www]` pool section loaded after the upstream image's stock pool files; PHP-FPM applies later same-pool declarations over earlier ones, so the generated file extends rather than replaces the image's pool and the stock listen socket (and nginx upstream) is untouched.
+- Implemented: `pm=ondemand` — with one pool per site, dynamic's resident spare servers would multiply idle workers and idle RSS by site count; ondemand holds no workers on an idle site and still reaches the full ceiling under load.
+- Implemented: host-derived ceilings with no artificial caps — the app container's memory limit is `min(96 MB × 4 × host CPU count, 40% of host RAM)` with a 512m floor, `pm.max_children` derives from that limit at 96 MB per worker, and the app CPU quota equals the host CPU count. Worked values: 2 vCPU / 2468 MB → 768m / 2.00 / 8 workers; 8 vCPU / 16 GB → 3072m / 8.00 / 32; 1 vCPU / 1 GB → 512m / 1.00 / 5.
+- Implemented: operators override individual pool values in `php/pool-custom.conf` (named in the generated file's header); regeneration rewrites `zz-wpfy-pool.conf` but never touches `pool-custom.conf` content.
+- Implemented: the WP-CLI service does not mount either FPM pool file — only the app service runs the pool.
+- Implemented: sites created before this file existed adopt it through `wpfy refresh <domain> --restart` (or `wpfy refresh all --restart`, which processes sites sequentially with a brief per-site 502 window while each site's app and web containers are recreated).
 
 ## Idempotency Behaviour
 - Implemented for files and directories: re-running with the same inputs updates only changed scaffold files and reuses existing directories.
@@ -48,6 +68,10 @@ wpfy site create example.com --wp --user=admin
 - Implemented after bootstrap failure: the scaffold/secrets remain reusable, no false-ready file pair is left, and a retry can complete normally.
 
 ## Failure Modes
+- Implemented: `--php` accepts only `7.4`, `8.0`, `8.1`, `8.2`, `8.3`, or
+  `8.4`; `--letsencrypt` accepts only `default`, `wildcard`, or `off`; and
+  `--dns` accepts only `cloudflare`. Lifecycle validation repeats these checks
+  before preflight or any scaffold write.
 - Implemented: invalid domain.
 - Implemented: Docker unavailable results in a runtime/provisioning skip rather than scaffold failure.
 - Implemented: Docker runtime startup failure when Compose returns a non-zero exit.
@@ -58,6 +82,8 @@ wpfy site create example.com --wp --user=admin
 - Implemented: `WPFY_SKIP_WORDPRESS_DOWNLOAD=1` is an explicit offline fixture; unexpected bootstrap errors never fall back to exit-0 placeholders.
 - Implemented: missing or malformed release metadata/digest and digest mismatch fail closed before archive extraction; retry reuses the existing scaffold and secrets.
 - Implemented: unsafe destination symlinks fail closed without changing their external targets; the ownership pass also rejects symlinks before runtime start, and a partial retry with active containers fails before download or copy.
+- Implemented: raw `--pass <password>` is rejected with exit code 2; use
+  `--pass -` or `--pass prompt`.
 
 ## Security Notes
 - Must create per-site PHP, DB, Redis, network, and volumes.

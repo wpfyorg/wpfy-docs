@@ -25,11 +25,11 @@ wpfy log cron [--lines N]
 ```
 
 ## Built-in Interval Tasks
-- `minute`: WordPress due events only.
+- `minute`: WordPress due events, due per-site jobs, and one bounded metrics sample.
 - `five-minute`: WordPress due events plus load health.
 - `hourly`: WordPress due events plus disk health.
 - `six-hour`: WordPress due events; no host mutation tasks.
-- `daily`: WordPress due events, all-site health summary, and cron log rotation.
+- `daily`: WordPress due events, all-site health summary, metrics retention pruning, and cron log rotation.
 - `weekly`: WordPress due events plus update-check guidance only.
 
 ## Expected Files Touched
@@ -49,6 +49,7 @@ wpfy log cron [--lines N]
 - Unsafe custom hooks are refused.
 - Custom hook failures are logged and reported.
 - Missing `systemctl` or systemd failures can make timer install/disable fail.
+- Metrics sampling/pruning failures are logged and return non-zero without preventing later tick work.
 
 ## Security Notes
 - Custom hooks run only when the hook path is a regular executable file and is not world-writable.

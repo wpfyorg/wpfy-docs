@@ -21,6 +21,10 @@ printf '%s\n' '<secret-key>' | wpfy backup storage set --profile weekly \
   --region auto \
   --access-key <access-key> \
   --secret-key-stdin
+# Explicitly accepts plaintext transport and its credential/archive exposure cost:
+printf '%s\n' '<secret-key>' | wpfy backup storage set --allow-insecure \
+  --endpoint http://minio.lan:9000 --bucket site-backups --region auto \
+  --access-key <access-key> --secret-key-stdin
 wpfy backup storage status
 wpfy backup storage test
 wpfy backup storage clear
@@ -47,6 +51,8 @@ wpfy backup schedule disable
 
 ## Security Notes
 - The stored access key and secret key are redacted in status/test output.
+- HTTPS is required for endpoints. HTTP fails closed unless `backup storage set --allow-insecure` deliberately persists `WPFY_BACKUP_S3_ALLOW_INSECURE=1`; that choice sends archive contents and SigV4 credentials over plaintext.
+- S3 requests refuse redirects that change scheme or host:port, so signed authorization headers never reach a redirect target or move from HTTPS to plaintext HTTP.
 - Stored default/profile config files are read without following symlinks; rejected reads return a controlled configuration error.
 - Schedule disable removes managed unit files only after `systemctl disable --now` succeeds, then reloads systemd.
 - Environment variables override the default stored config only.

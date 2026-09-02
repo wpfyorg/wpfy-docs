@@ -2,6 +2,74 @@
 
 ## Unreleased
 
+### Password argv hardening (2026-08-05)
+- **Breaking:** `wpfy site create --pass` and grouped `wpfy site update --password`
+  now reject raw password values. Use `-` for one stdin line or `prompt` from a
+  TTY; this keeps WordPress administrator passwords out of process argv.
+
+### Panel connection timeout (2026-08-05)
+- Accepted panel sockets use a 30-second idle timeout, bounding incomplete request lines and headers before authentication.
+- HTTP/1.1 keep-alive remains available when the next request arrives before that idle timeout.
+
+### Live-verification tour and shipped fixes (2026-08-01)
+- Completed the live-verification tour for the panel HTTP surface; the shipped behavior is verified on a live server rather than only by offline tests.
+- Fixed L13 so FlyingPress purge uses the registered `purge-everything` subcommand; the plugin cache is now actually purged on FlyingPress sites.
+- Fixed L12 so `cache.purge` records per-layer status and reports `partial` when only some layers clear instead of claiming `outcome: ok` for every layer.
+- Fixed L8 so the rendered Traefik static configuration is authoritative; configured ACME addresses reach the running proxy and the required force-recreate is no longer skipped.
+- Fixed L7 so panel failed-login throttling resolves the real client through the trusted edge instead of locking out every operator behind the proxy.
+- Fixed L9 by adding `--token-file` and `WPFY_PANEL_TOKEN`; `--token` remains accepted but warns because it exposes the token in the process table.
+- Fixed L11 so disabling the Redis object cache removes the orphaned container instead of leaving it running.
+- Closed L6 as a non-defect because cron timers were never installed, and kept L5 retracted because per-site cron is positively proven to run inside the site's own container.
+
+### First-run panel setup and anonymous telemetry (2026-07-28)
+- Added a run-token-authorized first-run wizard for the initial administrator, separate licence and telemetry choices, permanent HTTP 410 setup closure, edge-bound refusal, shared client throttling, and a 12-character password minimum.
+- Added profile fields, private install state, verified TOTP QR enrollment with explicit skip consequences, and pinned MIT QRCode.js provenance without relaxing CSP.
+- Added the exhaustive anonymous install payload, daily best-effort stdlib sender, empty built-in endpoint, environment override, exact-payload status output, and enable/disable controls. See ADRs 0025 and 0026.
+
+### Phase 6 Native Path-Jailed File Manager (2026-07-27)
+- Added native per-site file operations restricted to `app/`, with traversal rejection, `lstat` symlink-component refusal, retained directory descriptors, no-follow descriptor-relative operations, atomic writes/uploads, site-UID ownership, safe chmod modes, and typed non-empty-directory deletion.
+- Added panel browse/edit/upload/download/mkdir/rename/chmod/delete routes, pre-read upload limits, size-coherent editor JSON limits, and forced sanitized octet-stream attachment downloads.
+- Added the Files tab with breadcrumbs, drag-and-drop upload, textarea editing, `wp-config.php` caution, permissions/rename controls, and exact-name destructive confirmation; added thin `wpfy site files ...` scripting commands and ADR 0019.
+
+### Phase 5b Dashboard, Events, And Services Panel (2026-07-27)
+- Added host and per-site canvas graphs over the accepted metrics range vocabulary, labelled axes, accessible tabular data, and an actionable empty state.
+- Added Events domain/action filters with visible job IDs and a Services view covering Traefik plus site-derived container services.
+- Added exact allowlist validation before per-site Compose restart arguments and a separate destructive Traefik restart requiring typed `wpfy-traefik` confirmation.
+
+### Phase 5a Metrics sampler (2026-07-27)
+- Added a WAL-mode stdlib SQLite time-series store, indexed scope/range reads, 14-day retention, host sampling, and exact managed-domain Docker stats attribution.
+- Added `wpfy metrics sample|show|prune`, minute-tick sampling, daily pruning, and contained/logged metrics failures.
+- Fixed daily health reporting to use shared `HealthResult` readiness semantics, and added ADR 0018 plus the metrics command specification.
+
+### Phase 4b Security And Cron Panel (2026-07-27)
+- Added authenticated panel API routes and browser tabs for per-site security controls and scheduled jobs.
+- Made security previews write-free, required explicit acknowledgement before an unproxied Cloudflare-only change, and surfaced generated basic-auth passwords once.
+- Added site-derived cron service choices, enable/disable/delete/run controls, last-run summaries, and distinct skipped/failed/timeout outcomes.
+- Made real warning badges coral and high-contrast while routine PLAN badges remain neutral.
+
+### Phase 4a.5 Per-site Cron Runner Correction (2026-07-27)
+- Enforced per-site job timeouts inside the selected container with a longer host-side Compose client backstop, preventing timed-out jobs from surviving after their lock is released.
+- Removed the profile-only `wpcli` service from cron targets; WP-CLI work runs through the long-running `app` service with the same image and WordPress working directory.
+- Replaced job-output text matching with an authoritative Compose running-service probe after failed execution.
+
+### Phase 4a.2 Per-site security lockout controls (2026-07-27)
+- Added per-site basic auth with one-time generated passwords, redacted events, an out-of-document-root `nginx/htpasswd` hash, and in-place rotation for the individually mounted credential file.
+- Added Traefik edge Cloudflare-only allow lists sourced from effective Cloudflare ranges, plus DNS lockout preflight warnings and CLI `--force` handling.
+- Replaced hostname real-IP trust with the discovered wpfy edge CIDR and added Cloudflare hop trust for proxied sites; discovery failures return non-zero after installing fail-closed rules.
+- Verified 33 Phase 4 security gates, real-image `nginx -t`, Compose config validation, and live old-password rejection/new-password acceptance after rotation. Cron gates remain on their separate branch.
+
+### Phase 3a Native Cache Integration (2026-07-24)
+- Added orthogonal `page_cache` and `object_cache` persistence with automatic migration from legacy cache flavors.
+- Added native free-plugin installation, paid/BYO staging, wpfy FastCGI cache rules, Redis Object Cache wiring, layered purge, and the `wpfy cache` CLI surface.
+- Fixed wpfc startup by creating a site-uid-owned `cache-data/` bind mount at `/var/cache/nginx/fastcgi`; the directory remains outside the backup archive.
+- Fixed generated single-file bind mounts so updates preserve the host inode seen by running containers; Nginx reload failures now return non-zero, and site status/diagnostics run `nginx -t` to expose rejected generated configuration.
+- Added ADRs 0014/0015 and the cache command specification. Panel integration remains Phase 3b.
+
+### Phase 2b Panel Parity (2026-07-24)
+- Added Databases, PHP Settings, and Vhost tabs to the browser panel with responsive table wrappers, typed exact-name destructive confirmations, asynchronous one-time database credential delivery, Adminer loopback/tunnel guidance, PHP dry-run previews, and verbatim Nginx validation output.
+- Corrected panel HTTP status mapping for operational refusals: invalid input is 400, missing sites are 404, unavailable runtime validation is 503, and rejected Nginx content is 422 while preserving response bodies.
+- The generated `nginx/default.conf` content remains unavailable to the current panel API; the Vhost tab identifies its server path and ownership rather than widening the API in this UI-only phase.
+
 ### RC2 Release Closure (2026-07-19)
 - Prepared `v1.0.0-rc2` with matching package/CLI identity `1.0.0rc2`.
 - Local gates passed: 552 pytest cases, installer/export contracts, package
@@ -244,7 +312,7 @@
 ### Non-root Operator Support (2026-06-05)
 - Installed `/usr/local/bin/wpfy` wrapper now **self-elevates** via `sudo` when run by a non-root user, forwarding `WPFY_*`/`ACME_*` env across sudo's env reset, so a non-root login (e.g. the `ubuntu` cloud user) runs plain `wpfy …` with no typed `sudo`. Root logins exec the venv binary directly (unchanged). `WPFY_NO_SELF_ELEVATE=1` disables elevation. See ADR 0008.
 - Fixed `handle_site_wp` (`wpfy site wp`) to **always** inject wp-cli `--allow-root` (the wpcli container runs as root). The previous `os.getuid()==0` gate dropped it for a non-root operator and broke the command.
-- Validation harness retargeted for a non-root login: `scripts/vps-release-validation.sh` defaults to `ubuntu@43.205.111.80` / `m.wpfydev.top` and stages to `/home/<user>/wpfy-validation`; `scripts/vps-release-validation-remote.sh` runs unprivileged, invokes `wpfy` bare (exercising self-elevation), and sudo-prefixes only raw non-wpfy probes (raw `docker`/`ss`/`nft`/`iptables`, reads of root-owned files, `install.sh`, scanners over `/opt/wpfy/app`).
+- Validation harness retargeted for a non-root login: `scripts/vps-release-validation.sh` defaults to `ubuntu@<redacted-host>` / `m.wpfydev.top` and stages to `/home/<user>/wpfy-validation`; `scripts/vps-release-validation-remote.sh` runs unprivileged, invokes `wpfy` bare (exercising self-elevation), and sudo-prefixes only raw non-wpfy probes (raw `docker`/`ss`/`nft`/`iptables`, reads of root-owned files, `install.sh`, scanners over `/opt/wpfy/app`).
 - Tightened live validation: missing ACME issuance now records `SSL_CERT_NOT_ISSUED` and makes `all` exit nonzero; HTTP/HTTPS probes use bounded curl timeouts so blocked inbound 443 does not stall phases for minutes.
 - Improved `wpfy site create` terminal UX: provisioning now emits short progress updates to `stderr` on TTYs, and the final result is printed as a readable multi-line summary instead of a semicolon-chained sentence. Generated WordPress passwords are still shown once on successful fresh installs.
 

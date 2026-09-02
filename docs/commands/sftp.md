@@ -8,7 +8,7 @@ Manage per-site SFTP access.
 
 ## Syntax
 ```bash
-wpfy sftp <domain> --enable [--password <password>]
+wpfy sftp <domain> --enable [--password [-|prompt]]
 wpfy sftp <domain> --disable
 wpfy sftp <domain> --status
 ```
@@ -16,6 +16,7 @@ wpfy sftp <domain> --status
 ## Examples
 ```bash
 wpfy sftp example.com --enable
+printf '%s\n' "$SFTP_PASSWORD" | wpfy sftp example.com --enable --password -
 wpfy sftp example.com --status
 wpfy sftp example.com --disable
 ```
@@ -36,7 +37,8 @@ wpfy sftp example.com --disable
 - The configured per-site SFTP port not becoming ready after container start.
 
 ## Password Behaviour
-- Precedence on `--enable`: an explicit `--password` always wins (this is the rotation path), then the already-configured value, then a freshly generated one.
+- On `--enable`, `--password -` reads one password line from stdin and `--password prompt` reads it from a TTY. Raw argv values are rejected.
+- Precedence on `--enable`: an explicit accepted `--password` always wins (this is the rotation path), then the already-configured value, then a freshly generated one.
 - A newly auto-generated password is printed exactly once in the enable summary (`password (shown once): …`), mirroring the generated WordPress admin password behaviour. Explicit and pre-existing passwords are never echoed.
 
 ## Security Notes

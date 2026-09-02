@@ -1,0 +1,3 @@
+node_modules/
+kb/.vitepress/dist/
+.DS_Store

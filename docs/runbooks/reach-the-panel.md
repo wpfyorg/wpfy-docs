@@ -1,0 +1,104 @@
+# Runbook: Reach the panel — tunnel or expose
+
+## Status
+- Implemented. Tunnel is the default; exposure is opt-in and gated.
+
+## Goal
+Decide how you reach the browser control panel, and set it up.
+
+## Choosing
+
+The panel binds to `127.0.0.1` and is not reachable from the network. There are
+two ways to get to it, and the right answer for most installs is the first one.
+
+| | SSH tunnel | Traefik exposure |
+|---|---|---|
+| Setup | one command, nothing persisted | `wpfy panel expose`, a router, a cert |
+| Public attack surface | none — the panel is not listening publicly | the panel login page is on the internet |
+| Needs 2FA | no | yes, refused without it |
+| Needs a DNS record + working ACME | no | yes, preflighted |
+| Works from a phone | awkward | yes |
+| Survives a laptop change | yes, if the key does | yes |
+
+**Take the tunnel unless you actually need browser access from a device that
+cannot hold an SSH key.** Exposure is supported and gated carefully, but the
+tunnel removes the panel from the internet entirely, which no amount of gating
+matches.
+
+## Steps — tunnel (default)
+
+1. Start `wpfy panel` on the server. On a fresh install it prints a URL with a one-time bootstrap run-token fragment.
+2. On your workstation:
+   ```
+   ssh -L 8642:127.0.0.1:8642 <server>
+   ```
+3. Open the printed URL locally. If no users exist, complete the two-step wizard: create the administrator, then verify TOTP or explicitly confirm the skip consequence. After account creation, setup closes permanently and later visits use the normal sign-in screen.
+4. Sign in with your panel user.
+
+Nothing is installed and nothing is exposed. Close the SSH session to revoke
+access.
+
+## Steps — exposure (opt-in)
+
+1. Complete first-run setup through the SSH tunnel and enrol a TOTP factor. The CLI user/TOTP commands remain available for later users and recovery:
+   ```
+   wpfy panel user add <username> --role admin
+   wpfy panel totp enable <username>
+   ```
+   Exposure is refused until a factor exists. This is not advisory — the command stops. Account creation is also refused if an unconfigured panel is started in edge-service mode; return to the tunnel.
+2. Point a DNS A/AAAA record for the panel domain at the VPS.
+3. Configure the exposure router. The domain must be typed twice — `--confirm`
+   has to match `--domain` exactly:
+   ```
+   wpfy panel expose --domain panel.example.com --confirm panel.example.com
+   ```
+   This runs the same DNS/IP preflight as site SSL and never skips it. It writes
+   a Traefik file-provider router with TLS and a rate-limit middleware, on a
+   dedicated `wpfy-panel-edge` network. The command reports router configuration,
+   not public readiness.
+4. **Install the panel service. This step is mandatory; the router returns 502
+   without its backend:**
+   ```
+   wpfy panel service install
+   ```
+5. Check that both pieces are configured:
+   ```
+   wpfy panel expose --status
+   ```
+   The router must be `configured` and the service must be `installed` before
+   the public URL is expected to work.
+6. Reverse it at any time:
+   ```
+   wpfy panel expose --disable
+   ```
+   Idempotent — safe to run when nothing is exposed.
+
+> `wpfy panel expose --status` reports the generated router, recognised domain,
+> and whether the required panel service is installed. It is local configuration
+> state, not a public network probe; verify the HTTPS URL after both pieces are
+> configured. `expose --disable` remains the idempotent way to remove exposure.
+
+## Firewalls
+
+**wpfy does not manage your host firewall, and will not.** No UFW rules, no
+iptables rules of its own, no ports opened or closed on your behalf. Host and
+provider firewall policy stays yours, deliberately — a tool that silently edits
+firewall rules can lock you out of your own machine, and wpfy has no way to know
+what else the host is serving.
+
+The one exception is scoped and explicit: Login Shield's fail2ban jails — the host-managed panel jail (`wpfy-panel-auth`, activated by `wpfy stack install`) and any per-site jail you enable — insert and remove ban rules in Docker's `DOCKER-USER` chain while running. That is fail2ban acting, on jails WPFY installed for Login Shield. See `runbooks/login-shield.md`.
+
+## Recovery
+
+- Setup URL returns HTTP 410: expected after the first user exists. Sign in normally; use `wpfy panel user ...` for later users or recovery.
+- Skipped TOTP during setup: tunnel access still works, but exposure remains refused. Enrol later from the account panel or with `wpfy panel totp enable <username>`.
+- Exposed the panel and want it gone now: `wpfy panel expose --disable`, then
+  confirm the generated router file is absent from the Traefik dynamic
+  configuration directory.
+- Locked out by repeated failed logins: the lockout is time-based and clears on
+  its own. Check `wpfy log events` for the recorded failures.
+- Lost your TOTP device: an admin can clear another user's factor with
+  `wpfy panel totp disable <username>`. If it was the only admin's factor and
+  the panel is exposed, use the SSH tunnel to reach it.
+- Restarted the panel and everyone is logged out: expected. Sessions are
+  in-memory and do not survive a restart.

@@ -1,5 +1,473 @@
 # Worklog
 
+## 2026-09-01 — IPv6 validation day on Box A/B (ADR 0036 amended)
+
+Validation pass, docs-only (this worktree and the WPFY evidence dir; no source
+changes anywhere). Validation owner: parent. Raw transcripts live in the WPFY
+repo at `docs/release-evidence/ipv6-validation-2026-09-01/` — phase-0
+pre-migration, phase-1-2 client identity and ban, phase-3 IPv6 migration,
+phase-4 runtime hardening, each with a SUMMARY.md.
+
+- Stack: clean install from the WPFY HEAD `b74eb51` archive (sha-verified
+  before install; wpfy 1.0.0rc8), Box A 13.207.69.203 + Box B 3.110.143.170,
+  Ubuntu 24.04 (kernel 6.17.0-1019-aws), Docker 29.7.2 / Compose v5.5.0. Both
+  sites hold real Let's Encrypt certificates; external strict HTTPS verified
+  over IPv6 and IPv4 (verify=0, LE YR1/YR2, notAfter 2026-11-30). ACME issuance
+  was initially blocked by an AWS security group (443/tcp IPv4 only; IPv6 443
+  was open) — resolved same day by the parent, then two ACME orders completed
+  after a Traefik *container* restart; no daemon restart, no CA switch, no
+  workaround. Pre-migration manual v6 ban already rejected real traffic on
+  Docker 29.
+- Claim 2 (client identity) PASS: site-A nginx access-log field 1 was Box B's
+  exact global v6 (`2406:da1a:284:ef00:9c3f:1fd4:e61d:9139`), not
+  `172.18.0.1`; an `X-Forwarded-For: 2001:db8::dead` spoof was defeated;
+  Traefik edge discovery emitted v6 `/128`s and per-site `set_real_ip_from`
+  matched; `panel_edge_network_facts` handled dual IPAM and `_network_gateway`
+  parsed single addresses; a real failed WP login logged the true v6.
+- Claim 1 (ban enforcement) PASS organically: five real failed wp-login POSTs
+  from B auto-banned its v6 (no manual `banip`); during the ban `curl -6`
+  failed in ~0 ms with icmp6 port-unreachable while `curl -4` stayed 200
+  verify=0; the DOCKER-USER REJECT counter rose 0→2 packets; `unbanip` exit 0
+  restored strict v6 200. SSH safety held throughout: INPUT chains empty on
+  both families, fail2ban hooks only in DOCKER-USER, sshd jail 0 bans.
+- Claim 3 (migration) PARTIAL, as specified: daemon.json merge preserved the
+  operator key, seeded a wpfy backup, refused invalid JSON (exit 1, file
+  byte-identical); full Docker restart outage measured 36.7 s with complete
+  auto-recovery (all containers self-started, no intervention); no-force
+  migrate refused exit 2 with zero mutation (identical network IDs and
+  container list); forced migrate ran with a measured 2.1 s user-visible
+  outage (one dropped sample + one 404) vs the 36.7 s restart, and a second
+  forced run was idempotent ("already has IPv6 topology"). NOT proven: the
+  `stack install` exit-3 refusal of still-IPv4-only edge networks — Docker 29
+  created both edge networks dual-stack at initial creation, so the mismatch
+  branch never fired; recorded as a prior-state deviation, not a pass.
+  External healthz.html answers 403 by site config; 403 was used consistently
+  as the availability baseline across both outage measurements.
+- Claim 4 (runtime hardening) PASS from the clean installed source tree
+  (fresh extraction of the same `b74eb51` archive, 5-file sha256 spot-check
+  identical; `/opt/wpfy` carries no `tests/`, so extraction was required):
+  `RUN_DOCKER_RUNTIME_HARDENING=1 bash tests/docker-runtime-hardening.sh`
+  reported RESULT failures=0 skips=0 — socket-proxy POST mutation refused
+  (HTTP 405), neighbour-network healthz 403, /version//containers/json//events
+  200 from Traefik, container-local healthz ok; `docker-hardening.sh` and
+  `exposed-ports.sh` exit 0 with zero [FAIL]; `wpfy secure --all` result PASS.
+  Disposable compose projects cleaned up fully; live stack untouched (docker
+  service never restarted; same 8 containers healthy). Inspect NET_RAW
+  representation quirk recorded separately: compose writes `cap_drop: [ALL]`,
+  Docker 29.7.2 keeps it literal, so inspect never shows the literal NET_RAW
+  although bit 27 (0x08000000) is effectively dropped — process CapEff = 0
+  everywhere except Traefik's 0x400; `wpfy secure` matches via the ALL branch.
+- Historical correction, recorded as fact: the 2026-08-21 finding that inbound
+  IPv6 was userland-relayed and bans sat at 0 packets is
+  Docker-version-specific. On Docker 29.7.2 it did not reproduce in either
+  daemon state — a manual pre-restart ban counted 2 packets and blocked v6
+  (phase-0 evidence 28–31), and the organic post-restart ban counter rose 0→2
+  (phase-1-2 evidence 08–11). The daemon-gated protection claim is retained by
+  design; on this Docker version it is conservative (withholding a partly-true
+  claim), not over-claiming.
+- Residual gaps stated honestly: the panel-edge real-IPv6-bind branch
+  (`validate_panel_edge_bind` IPv6 path) was not exercised live; wpfy exposes
+  no operator ban CLI (security = status/repair/test/unban only), so the
+  never-ban guarantee was verified only emission-side — the bridge mu-plugin
+  redacts `fd4a:3b1c::/48` (plus sentinel/loopback/172.16/12) to `0.0.0.0`,
+  which the strict failregex rejects. A manual fail2ban-native `banip`
+  (labelled MANUAL, bypassing wpfy) listed in the jail but produced no
+  blackhole; this is not claimed as an operator ban rejection.
+- Scope kept: Box A/B and the WPFY evidence dir only on the WPFY side; docs
+  edits only in the five allowed files in this clean worktree. Nothing
+  committed.
+## 2026-09-01 — Docs pass: rc8 checklist alignment and SMTP alerting scope decision
+
+Documentation-only pass; no scripts or code changed. Validation owner:
+parent orchestrator.
+
+- RELEASE-NOTES-rc8.md: the live-validation checklist now names the supported
+  `scripts/vps-release-validation.sh` defaults (`ubuntu@43.205.111.80`,
+  `m.wpfydev.top`) instead of the ad-hoc dual-stack host/address, and
+  documents the script's supported `--target`/`--domain-base` override
+  invocation as the required path for the intended dual-stack host (the IPv6
+  ban test needs one). A dated line states no live validation has occurred
+  and no checklist item is claimed as passed.
+- Decision recorded: v1 production SMTP alerting deferred to v1.1 (ADR 0037).
+  Planned direction: global SMTP configuration with per-site propagation plus
+  event-driven alert rules. Final secrets storage/isolation design deferred
+  to an implementation ADR required before any alerting code ships. Hard
+  constraint: production SMTP credentials must not be shared directly across
+  site containers.
+- Files changed: wpfy-pvt `RELEASE-NOTES-rc8.md`, `ROADMAP.md`,
+  `CHANGELOG.md` (Unreleased/Decisions); wpfy-docs `DECISION-LOG.md` (new
+  top entry), `adr/0037-smtp-alerting-scope-and-credential-isolation.md`
+  (new), `MEMORY.md` (Planned/Deferred + Latest Decisions), this worklog.
+
+## 2026-08-25 (follow-up) — Installer staged-release activation and source redaction
+
+Implementation pass on the installers plus a disposable Ubuntu/VPS rerun;
+docs recorded in CHANGELOG, MEMORY, and HANDOFF the same day. Uncommitted at
+documentation time.
+
+- Archive source values no longer log: download/copy failures print generic
+  messages with curl/cp diagnostics suppressed, and the bootstrap log line
+  names only the ref — an archive URL may carry private tokens or signed
+  query parameters.
+- Repeated bootstrap reuses the symlinked venv: `python3 -m venv` cannot
+  create through a symlink, so the root installer now validates the target
+  interpreter and logs the reuse instead.
+- Activation is release-local: when a versioned layout is active and the
+  bundled installer stages a fresh physical app tree, it moves to
+  `releases/release-<stamp>/app`, the release links the existing active venv
+  (`../<previous>/venv`) or moves a physical one, pip reinstalls wpfy
+  editable against the release's own tree (a reused venv's editable metadata
+  records the pre-move source location), and `import wpfy` must resolve to
+  that release's `app/src` before `current` is repointed. Rollback is
+  repair-first once the editable reinstall has run against a venv shared
+  with the previous release: the shared interpreter reinstalls wpfy editable
+  against the previous release's own app, and the partial release is deleted
+  only after that repair succeeds, leaving the previous release usable
+  behind canonical root links. If the repair itself fails, the staged
+  release is deliberately kept — it then holds the only source tree the
+  shared venv still resolves to — and the installer prints exact manual
+  recovery guidance: run `pip install -e` against the previous release's app
+  with the shared interpreter, delete the retained release, and rerun the
+  installer. Failures before any shared-venv mutation (staged-app relink,
+  missing `src/`) keep the plain delete path. The repair interpreter is
+  built only after resolving the shared-venv symlink to its target; a
+  dangling or unusable target refuses the repair — keeping the staged
+  release — and never falls back to host `/bin/python`.
+- VPS evidence: redaction probe passed. The initial rerun exposed two
+  defects — venv creation attempted through the symlinked venv path and an
+  activation path bug — both discovered with the previous release left
+  active by the rollback, then fixed. The final repeat bootstrap exited 0:
+  `current` moved to `release-20260825055831-21347`, root links are
+  `current/app` and `current/venv`, the Python import resolves to the new
+  release's `app/src`, and the wrapper version ran.
+- Final full pytest for this follow-up: 2277 passed. Offline installer
+  coverage grew to 27 passing checks in `tests/installer-idempotency.sh`
+  (exit 0 locally), including shared-venv import and pip failure paths,
+  repair-before-delete ordering, the failed-repair retention path with
+  recovery guidance, and a dangling shared-venv symlink regression
+  (interpreter guessing refused, staged release kept).
+- Not performed: root/Docker-mutating shell tests, independent installer
+  review, live VPS rerun of the repair-first rollback.
+
+## 2026-08-25 (final) — Disposable-VPS installer gate closed (W4-11)
+
+Validation pass on the disposable Ubuntu VPS; docs recorded in CHANGELOG,
+MEMORY, and HANDOFF the same day.
+
+- The full staged installer completed end-to-end twice.
+- Failure-rollback probe: a forced staged-source install failure restored the
+  previous source and exited 97 (the failing step's status propagates through
+  `install_failed`, which restores then exits with the step status).
+- The `/opt/wpfy/app` symlink was identical before and after the failed run,
+  resolving to `/opt/wpfy/releases/legacy-20260825013714-2557/app` — the
+  versioned-layout migration preserved the prior release and rollback did not
+  disturb it.
+- `wpfy --version` ran successfully after the failure, proving the rolled-back
+  source stayed importable and executable.
+- Prior cleanup-trap defects corrected in both installers: `wpfy`
+  (`cleanup_session`) and `install.sh` (`cleanup`) used `[[ -n "$VAR" ]] &&
+  rm …`, which returns 1 when the variable is empty and could distort exit
+  statuses under `set -euo pipefail` inside traps; both are now explicit `if`
+  blocks ending in `return 0`. Covered by a new `tests/installer-idempotency.sh`
+  check ("installer cleanup succeeds without a session directory").
+- Follow-up the same day: full offline `pytest -q` passed — exit 0, 2277
+  passed in 649.22s. It needed one test-only fixture correction first:
+  `tests/test_edge_backup.py`'s `_patch_traefik_paths` now rebinds the
+  module-level `PATHS` to a `dataclasses.replace(...)` copy whose `state_dir`
+  sits under the tmp root — `WpfyPaths` is a frozen dataclass, and the
+  edge-backup transaction lock resolves its flock file as
+  `Path(settings.PATHS.state_dir) / "traefik.lock"` at call time, so the old
+  fixture left the lock outside the tmp tree; targeted rerun 4 passed. No
+  source changes.
+- Still not performed: root/Docker-mutating shell tests, independent
+  installer review. W1 tranche
+  focused counts (524 / 217 / 4 / 86 / 27) stand as recorded below; only W4-11
+  gained VPS evidence.
+
+## 2026-08-25 (later) — Ponytail W1 mechanical batches completed
+
+Implementation pass; this entry records completion and evidence only.
+
+- W1-02 (`try/except X: pass` → `contextlib.suppress(X)`): converted across
+  `site_layout.py`, `site_security.py`, `panel_auth.py`,
+  `fail2ban_docker.py`, `fail2ban_host.py`. Suppression-batch pytest —
+  524 passed.
+- W1-07 (`unlink()` guards → `Path.unlink(missing_ok=True)`): convertible
+  Path-based sites converted; the `os.unlink(..., dir_fd=...)` no-follow
+  sites stay as-is by design. Unlink-batch pytest — 217 passed.
+- W1-10 (`TLS_MODES` hand-copy + match validator →
+  `typing.get_args(TLSMode)` in `smtp.py`): Literal order, argparse choices
+  display, and error text preserved. TLS-modes pytest — 4 passed.
+- W1-03 tranche two: remaining modules import the shared lazy
+  `current_paths()` exported from `settings.py`; per-module `_current_paths`
+  names retained so test call sites and monkeypatch targets survive.
+  Path-access tests — 86 passed.
+- CodeDebrief artifacts regenerated and validated OK, superseding the
+  earlier analyzer-blocked refresh.
+
+All evidence is offline/local; the disposable Ubuntu/VPS gate has not run.
+Validation owner: orchestrator.
+
+## 2026-08-25 — Ponytail W4-11 / W1-03 local validation status
+
+Docs-only pass; no source, test, or ADR changes here.
+
+- W4-11 (installer source identity): local installer shell tests passed —
+  `bash tests/installer-idempotency.sh` and `bash tests/installer-payload.sh`,
+  both exit 0 (offline checks on a non-Linux host). The disposable Ubuntu/VPS
+  install gate is still pending; no live host was exercised.
+- W1-03 (`_current_paths()` exported once from `settings.py`):
+  `pytest tests/test_registry.py tests/test_events.py -q` — 27 passed,
+  offline. Broader suite runs remain with the orchestrator.
+- CodeDebrief refresh is blocked by an unavailable analyzer; the existing
+  `codedebrief-out/` artifacts were not regenerated.
+
+Validation owner: orchestrator.
+
+## 2026-08-23 — Managed panel-edge UFW rule
+
+Implemented panel-edge firewall convergence. Wpfy dynamically discovers the
+Docker `wpfy-panel-edge` private bridge facts, then stages an exact UFW INPUT
+rule constrained to the bridge interface, private subnet, gateway destination,
+and TCP panel port. It never opens public 8642. Panel expose, service install,
+and firewall enable all converge the rule; disable removes only wpfy
+marker-owned rules across ports and preserves operator rules.
+
+Live security verification received Oracle APPROVE. Focused 324 tests passed;
+public panel/site HTTPS returned 200, bridge upstream returned 200, exactly one
+managed rule existed, and direct public 8642 was closed. The first post-restart
+502 was a transient 1--2 second restart gap and recovered, not a regression.
+The full suite was not completed locally because of duration.
+
+## 2026-08-21 (later) — TODO round: rate limiter, SMTP rename, rc5 docs
+
+Worked the actionable half of `TODO.md`. The items still owed a Linux host —
+live socket-proxy allowlist enforcement, fail2ban banning for real, ufw/IPv6
+beyond one box, the diagnostics re-probe — were not touched and remain open.
+
+Panel request rate limiter. `expose --no-domain` never passes through Traefik,
+so it inherited none of the panel router's `rateLimit`. The guard went into
+`PanelHandler` rather than behind a domainless branch, so it covers
+Traefik-fronted, direct-bind and loopback with one check. First cut used a
+module-global bucket table and burst 40; that failed six gate tests with 429,
+and an isolated gate test failed standalone too — the panel declares 101 routes
+and the G1/G2 sweeps walk all of them twice in one test. Resisted raising the
+burst: on `ThreadingHTTPServer` burst size is the thread-spike an attacker
+gets, so tuning it to fit a route sweep weakens the control. Instead the bucket
+table moved into the `make_panel_server` handler closure and the limits onto
+`PanelConfig`, so the sweeping gate tests raise their own ceiling. Suite: 2064
+passed, up from 2059 with no regressions. ADR 0033 amended.
+
+Mail page renamed to SMTP. Copy only — route `/admin/mail`, API paths and
+stored keys unchanged. `smtp.py` stores a transport and sends a test message;
+nothing sends mail on an event, so the old name promised alerting that does not
+exist. README now says so outright. The nav icon moved from the notification
+bell to the envelope already in the sprite, and the orphaned `i-bell` symbol
+was dropped.
+
+Docs for rc5. README pointed at `releases/tag/v1.0.0-rc4` in eight places and
+that tag was never cut — newest is rc3. Links now target rc5 and resolve once
+the tag exists; the install snippet keeps a marked placeholder for the
+source-archive checksum. Validation claims were re-derived from TODO rather
+than relabelled: the socket-proxy allowlist is stated as proven configuration,
+not enforcement. ROADMAP rewritten against the rebuilt panel. Hero screenshot
+replaced with the rebuilt-panel capture — its chip still reads rc4 and its
+sidebar still says Mail, so it wants a re-capture.
+
+Also: `stack acme-email` now names `wpfy stack install --nginx` instead of
+saying a restart is required and stopping there, and first-run setup copy stops
+mentioning a run token on domainless panels, where none is printed.
+
+
+## 2026-08-15 (later still) — Site wizard verified, expose now asks for its inputs
+
+Created `wiz.wpfydev.top` through the panel wizard end to end on the clean VPS:
+domain validation refusing `not a domain`, the correcting keystroke clearing
+the error without rebuilding the input, preview-plan dry run, then a real
+create job (preflight, scaffold, bootstrap, runtime). Site came up ready with a
+Let's Encrypt certificate and served WordPress over HTTPS. The success screen
+links to the domain, not the job id, and neither the WordPress admin password
+nor the SFTP password appears in the job payload `GET /api/jobs` returns.
+
+One defect: the site Overview showed a working site's status in red, because
+the badge tested for "healthy" -- a value `site_health` never emits. Green was
+unreachable for every site in every state.
+
+`wpfy panel expose` now asks for the domain and, when the host has no ACME
+contact, the email -- the thing that decides whether a certificate can issue at
+all. Set before the router is written, so Traefik picks it up.
+
+## 2026-08-15 (later) — Clean-VPS install pass
+
+Wiped box, `install.sh` from a branch tarball with a checksum, then stack,
+panel, and both exposure modes. Six defects, each with a test.
+
+Installer: `wpfy stack install` reported `fail2ban: FAIL` on every fresh host
+and the rollback removed the package it had just installed. Two causes -- the
+panel jail's logpath does not exist until the panel's first auth failure, and
+the `fail2ban-client ping` check raced the socket the server binds after
+`systemctl start` returns.
+
+Panel: the dashboard opened on "1 service degraded: wpfy-traefik" against a
+healthy container, because `traefik_status()` returns the whole `docker compose
+ps` table and both the services list and the overview card used it as a status
+field; underneath, every client surface treated `running` as the only healthy
+value, so anything with a healthcheck read as degraded.
+
+Exposure: `expose --domain` succeeded while ACME could never register (the
+placeholder `admin@localhost` contact), and storing a basic-auth credential made
+wpfy's own router unrecognisable -- which is the exact condition that stops the
+credential being applied.
+
+Proven working after: first-run setup completed through the real UI over the
+setup link (fragment read, stripped, used as bearer), TOTP enrolled and
+verified, sign-in, SSE stream, a Let's Encrypt certificate for
+panel.wpfydev.top, and basic auth enforced by real Traefik (401/401/200).
+
+## 2026-08-15 — Validation VPS pass on the panel rebuild
+
+Ran the ufw port management and the domainless exposure against
+155.94.241.76 (Ubuntu 24.04, ufw 0.36.2, live Traefik + two sites). Seven
+defects, each fixed with a test.
+
+ufw: an inactive ufw prints no rule list, so configured rules read as absent
+(`ufw show added` is the only listing that survives it being off); real ufw
+prints the rule comment inside the `From` column, which put comment text in
+the rendered source, defeated the IPv6-twin dedupe, and made a
+source-restricted rule undeletable from the panel.
+
+Domainless exposure: the mode was unreachable by the command it printed
+(added `wpfy panel --public`); the setup secret was keyed to `edge_bind`, so
+an administrator could be created over the internet with no secret — proven
+from a laptop; the printed setup link could not authenticate the request that
+carried it; an active ufw blackholed the panel with no explanation; and the
+basic-auth credential was hashed with sha512crypt, which Traefik cannot
+verify, so it refused the correct password forever.
+
+Proven working afterwards: SSH survives `enable()`, the guards refuse the SSH
+port and any range covering it, the fingerprint agrees with what the browser
+is offered, the setup link creates the first administrator over the internet
+and is single-use, and Traefik enforces basic auth 401/401/200.
+
+Ran ufw behind a keepalive watchdog that disables it if I stop checking in.
+Host restored: router file, firewall, and units all back as found; both sites
+serving 200.
+
+## 2026-08-05 - Validate site field vocabularies before persistence
+- Added shared PHP, Let's Encrypt, and DNS-provider vocabulary checks at the
+  create/update lifecycle choke points before preflight, scaffold rendering, or
+  writes; `off` now disables SSL during create rather than enabling it. Persisted
+  site state is validated before every update or SSL operation.
+- CLI argparse and panel boundary checks consume the same constants.
+
+## 2026-08-05 - Close password and Authorization sibling gaps
+- Reused the shared password parser for `sftp --password`: `-` reads stdin and `prompt` requires a TTY; omitted SFTP passwords still generate once. Raw panel `--token` now fails in favour of `--token-file` or `WPFY_PANEL_TOKEN`.
+- Extended event redaction with distinct `AUTHORIZATION` matching, masking Bearer and Basic header values while retaining byte-identical `authority=high`, `authored=yes`, and `authorised personnel only` diagnostics.
+
+## 2026-08-05 - Correct event redaction coverage and boundaries
+- Extended centralized event redaction to boundary-delimited `PWD`, `PASS`,
+  `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `CREDENTIAL`, and `AUTH` assignments,
+  consuming full single- or double-quoted values as well as unquoted values.
+  Cron command details remain recorded but no longer retain these secrets in
+  JSONL or the panel.
+- Replaced substring matching with letter/digit token boundaries, preserving
+  harmless diagnostics including `monkey=12` and `authority=high` instead of
+  silently corrupting their values. Redaction remains best-effort: secrets
+  without recognizable assignment keys can still be logged.
+
+## 2026-08-05 - Keep WordPress passwords out of argv
+- Generalized the existing database password parser and reused it for `site create --pass` and grouped `site update --password`.
+- Both commands now accept only `-` for one stdin line or `prompt` on a TTY; raw values fail before lifecycle/event work with exit code 2. Fresh `site create` password generation remains unchanged.
+- Documentation gives stdin automation examples; passwords are never accepted in argv.
+
+## 2026-08-05 - Harden restored and new basic-auth credentials
+- Replaced new unsalted `{SHA}` writes with OpenSSL sha512crypt (`$6$`) hashes; `openssl passwd -6 -stdin` keeps passwords out of process argv without adding a Python dependency.
+- Hosts without OpenSSL use fresh-salt APR1 (`$apr1$`), and the basic-auth operation event records which scheme was selected. OpenSSL failures fail closed. In-place writes and running-nginx reload behavior remain unchanged; restore resets `nginx/htpasswd` to `0640` and the shared ownership pass reapplies site uid:gid.
+
+## 2026-08-05 - Create secret files privately
+- Opened site `.env` files during scaffold regeneration and restore, stored S3/Cloudflare/SMTP configurations, and downloaded remote archives with mode `0600`; retained existing ownership behavior and in-place generated-file writes.
+- Kept health files, nginx snippets, PHP ini files, and other non-secret generated bind mounts at their existing modes. Protected F5 gates verify each secret creation path under `umask(0)`.
+
+## 2026-08-05 - Bound panel idle connections
+- Added module-level `PANEL_SOCKET_TIMEOUT = 30`; the panel server applies it to each accepted socket before request parsing, so incomplete unauthenticated lines/headers cannot hold a worker indefinitely.
+- Kept `HTTP/1.1` keep-alive unchanged for requests arriving before the timeout. Protected F4 coverage and full panel regression verify the behavior.
+
+## 2026-08-05 - S3 backup transport and redirect guard
+- Required HTTPS for S3 backup configuration; `--allow-insecure` deliberately persists the only HTTP opt-out as `WPFY_BACKUP_S3_ALLOW_INSECURE=1`, while plaintext configuration otherwise fails closed.
+- Replaced default `urlopen` with a shared opener that refuses a redirect whose host:port differs from the signed request, keeping SigV4 authorization material at the configured endpoint.
+- Added CLI regression coverage and verified protected F3 endpoint/redirect gates.
+
+## 2026-08-05 - Per-site security controls reach the running edge
+- Corrected runtime convergence: stopped sites stage reload controls and report startup application, while Cloudflare-only compares live `web` labels and skips matching state; stale or unreadable labels still trigger recreation.
+- Made basic-auth, deny-IP, user-agent, and login-rate-limit mutations reload the affected Nginx service after successful render; made Cloudflare-only force-recreate `web` after regenerating its Traefik labels.
+- A runtime failure now returns non-success while preserving staged state and explicitly reports that configuration was not applied; repeat CLI and panel requests retry application safely.
+- Preserved scaffold-time/file-only security rendering and offline `WPFY_SKIP_RUNTIME` or unavailable-Docker behavior. Verified protected mocked and real-Docker F1 gates plus focused regression coverage.
+
+## 2026-07-28 - First-run panel setup and telemetry
+- Added private install state, forward-compatible user profile fields, run-token setup status/create routes, permanent post-setup closure, edge refusal, shared client throttling, and a 12-character password minimum.
+- Added a responsive two-step wizard with separate licence/telemetry choices, verified TOTP enrollment, explicit skip consequences, and pinned MIT QRCode.js provenance under the unchanged CSP.
+- Added exhaustive seven-field opt-out telemetry, daily lock-serialized background delivery, an intentionally empty built-in endpoint, environment override, and exact-payload CLI controls.
+- Added focused setup/auth/telemetry tests and ADRs 0025/0026. Live VPS proof remains to be recorded separately.
+
+## 2026-07-27 - Phase 5b dashboard, Events, and Services panel
+- Added authenticated metrics and structured services endpoints plus site-scoped and separately confirmed edge restart routes.
+- Reused `site_cron._allowed_services(domain)` through its validator before any service name reaches `docker compose --project-name <site> restart <service>`.
+- Added responsive host/per-site canvas graphs, explicit no-sample guidance, Events domain/action filters with visible job IDs, and a Services page whose edge warning says every site is affected.
+- Added focused loopback endpoint tests including real argument-vector assertions; all 312 immutable gates and all 1098 tests passed.
+
+## 2026-07-27 - Phase 5a metrics sampler
+- Added a mode-0600 SQLite database with WAL, exact-scope range and timestamp retention indexes, host `/proc` sampling, and one bounded whole-machine Docker stats call.
+- Resolved container names against whole candidates built from (project x known service), accepting `{project}-{service}` with an optional replica index, so strict-prefix projects, the shared Traefik container, and unrelated Compose stacks cannot be misattributed. Requiring the replica index would have discarded every wpfy container, since each generated service sets an explicit `container_name`; the gate fixture was corrected to production naming so that parser can no longer pass.
+- Joined sampling to the minute tick and pruning to the daily tick with explicit failure lines while preserving other cron tenants; corrected daily `HealthResult` handling through shared readiness semantics.
+- Added `wpfy metrics sample|show|prune`, focused parser/storage/concurrency tests, ADR 0018, and the metrics command specification. Real-Docker and full-suite evidence is recorded in the Phase 5a report.
+
+## 2026-07-27 - Phase 4b security and cron panel
+- Added bearer-protected security and cron routes with mutating metadata derived by the existing authorization gates.
+- Security dry-run builds and validates desired state plus preflight warnings without calling operation-layer mutators; unacknowledged Cloudflare lockout warnings return before mutation.
+- Added responsive Security and Cron tabs, one-time basic-auth credential rendering, site-derived service choices, real run outcomes, and a coral high-contrast WARN badge distinct from neutral PLAN.
+- Added focused live-loopback endpoint tests for dry-run immutability, acknowledgement, credentials, leak scans, cron CRUD, service isolation, and skipped execution outcomes.
+
+## 2026-07-27 - Phase 4a.5 per-site cron runner correction
+- Moved the authoritative timeout into the selected site container as `timeout -k 5` around a fixed supervisor; the host subprocess timeout adds 15 seconds for exec startup, five for in-container kill grace, and five as a Compose-client wedge backstop.
+- Confirmed all PHP versions, Nginx, MariaDB, Redis, SFTP, and Adminer images provide both `timeout` and `setsid`. Because raw BusyBox timeout leaves background descendants alive, the supervisor uses a new process group, TERM then KILL, and a random marker that distinguishes expiry from a command's natural exit 124.
+- Removed profile-only `wpcli` from selectable cron services, migrating prior `wpcli` entries to `app`; a live `app` container confirmed `wp` at `/usr/local/bin/wp` and working directory `/var/www/html`.
+- Replaced job-output string matching with a failed-exec Compose running-service probe. Two live 2-second timeout ticks using `sleep 61 & wait` left no command, timeout, supervisor, or descendant process after either run.
+- Verified 44 cron gates (with 33 expected security-branch failures), 707 non-gate tests, and the immutable gate checksum.
+
+## 2026-07-27 - Phase 4a.2 per-site security lockout controls
+- Completed basic auth, Cloudflare-only edge enforcement, DNS lockout preflight, and dynamic real-IP trust on top of the Phase 4a.1 security state/rendering contract.
+- Kept `nginx/htpasswd` outside `app/`, mode `0640`, and updated it in place with no-follow flags because Compose mounts the individual file; live Docker rotation preserved host inode `62464967` and container inode `300`, with 43 bytes on both before and after.
+- Real Docker evidence: `nginx -t` succeeded; old basic-auth credentials returned HTTP 401 while the rotated credential returned HTTP 200; the managed healthcheck became healthy after explicitly disabling inherited auth for `/healthz.html`.
+- Cloudflare-only labels use the effective published ranges and `docker compose config --quiet` returned 0. The first 33 Phase 4 security gates passed; the full suite had 818 passes and 44 expected cron failures because `site_cron` is absent on this branch; non-gate tests had 661 passes.
+- Extended ADR 0016 and the decision log with edge-vs-origin enforcement, CIDR trust trade-off, credential mount/revocation behavior, and preflight scope.
+
+## 2026-07-24 - Phase 3a.3 single-file bind mount fix
+- Changed generated `nginx/cache-path.conf` installation from atomic replacement to an inode-preserving no-follow write because Compose mounts the file individually and a running container remains pinned to the original inode.
+- Kept `nginx/extra/wpfy-cache.conf` on candidate-plus-atomic-swap semantics inside its directory bind mount, with non-`.conf` candidate names and cleanup on every exit path.
+- Made cache reload rejection non-zero and actionable, retrying briefly for delayed shared-folder propagation, and added running `nginx -t` checks to site health and diagnostics so an HTTP-healthy site cannot report ready when Nginx rejected generated configuration.
+- Added offline inode-identity and reload-reporting regression coverage; application and real-Docker verification are recorded in the Phase 3a.3 report.
+
+## 2026-07-24 - Phase 3a.1 FastCGI cache startup fix
+- Fixed wpfc startup by creating a per-site `cache-data/` directory before Compose rendering, adding it to the managed-path symlink guard and site-uid ownership pass, and bind-mounting it at `/var/cache/nginx/fastcgi`.
+- Kept plugin-based cache modes unchanged: their cache-path snippet remains empty and they do not mount or create `cache-data/`.
+- Verified 113 gates, 720 full pytest tests, immutable gate checksum, double-refresh byte stability, and real-image `nginx -t` as uid 100000.
+
+## 2026-07-24 - Phase 3a native cache integration
+- Split page-cache and Redis object-cache selection into independent persisted axes with legacy `SITE_FLAVOR` migration.
+- Added native free-plugin installation, paid/BYO staging, wpfy FastCGI cache rendering, Redis Object Cache wiring, safe bypass rules, and layered purge operations.
+- Added `wpfy cache <domain> show|set|object|purge` plus orthogonal create/update shortcuts; panel files remain reserved for Phase 3b.
+- Added ADRs 0014 and 0015 and the cache command specification. Verified 718 pytest cases and 113 immutable gates in the application worktree.
+
+## 2026-07-24 - Phase 2b panel parity
+- Added browser tabs for Databases, PHP Settings, and Vhost with typed exact-name confirmations, one-time database credential rendering, Adminer loopback/tunnel guidance, PHP dry-run previews, and verbatim Nginx validation output.
+- Centralized panel operation status mapping so invalid input, missing sites, unavailable runtime, and rejected Nginx content use 400, 404, 503, and 422 respectively.
+- Recorded generated `nginx/default.conf` API exposure as a remaining limitation; UI identifies the wpfy-owned path without widening the Phase 2a API.
+
+## 2026-07-24 - Phase 2a per-site databases and config overrides
+- Added isolated database/user operations with exact identifier validation and in-container MariaDB secret expansion.
+- Added durable PHP settings, operator-owned PHP/Nginx override files, fail-closed Nginx validation, loopback-only Adminer, CLI commands, and panel routes.
+- Added Phase 2a operation/API regression tests and ADR 0013; final verification is recorded in the application repository report.
+
 ## 2026-07-19 - RC2 release closure
 - Created separate A–F implementation, payload/export, and private-evidence commits.
 - Verified clean-commit tests, installer/export contracts, test-free wheel/sdist,
@@ -105,7 +573,7 @@
 - Added `src/wpfy/site_lifecycle.py` as the interface for site create, update, and SSL enablement.
 - Moved preflight ordering, desired site specification, scaffold/runtime sequencing, WordPress provisioning, and registry updates out of `cli.py`.
 - Retargeted CLI tests to the lifecycle interface and added direct lifecycle tests for operation ordering, preflight safety, registry updates, and preservation of existing site settings.
-- Live VPS validation on `155.94.241.76` found that later SSL enablement left WordPress canonical URLs on HTTP; fixed the lifecycle to update `home` and `siteurl` through WP-CLI.
+- Live VPS validation on `<redacted-host>` found that later SSL enablement left WordPress canonical URLs on HTTP; fixed the lifecycle to update `home` and `siteurl` through WP-CLI.
 - Verified the full test suite with 161 passing tests before redeployment.
 
 
@@ -121,7 +589,7 @@
 - Added focused shell coverage for TTY rendering, non-TTY stability, verbose/log behavior, progress continuity, success, failure, and signals.
 
 ## 2026-06-06 - Live WordOps UX verification
-- Installed WordOps 3.22.0 and its recommended stack on the disposable VPS at `155.94.241.76`.
+- Installed WordOps 3.22.0 and its recommended stack on the disposable VPS at `<redacted-host>`.
 - Verified a live WordPress and Let's Encrypt flow on `ux.wpfydev.top`, including HTTP redirect, HTTPS response, and WordPress core installation.
 - Added TTY-only progress messages to `wpfy stack install` before each selected component pull/start operation, based on the observed value of WordOps' long-running step feedback.
 
@@ -135,7 +603,7 @@
 - Added `tests/installer-swap.sh` and wired it into `scripts/security-audit.sh` for deterministic dry-run coverage of swap sizing, disables, overrides, and no file creation.
 - Step 1 of non-root (`ubuntu`) operator support: made `/usr/local/bin/wpfy` self-elevate via `sudo` (forwards `WPFY_*`/`ACME_*`), so non-root logins run plain `wpfy …` (ADR 0008). Root logins unchanged; `WPFY_NO_SELF_ELEVATE=1` escape hatch.
 - Fixed `handle_site_wp` to always inject wp-cli `--allow-root` (wpcli container runs as root; host-uid gate broke non-root operators).
-- Retargeted validation harness to `ubuntu@43.205.111.80` / `m.wpfydev.top`: home-based staging dir, remote runner runs unprivileged with `wpfy` bare and `$SUDO` only on raw non-wpfy probes.
+- Retargeted validation harness to `ubuntu@<redacted-host>` / `m.wpfydev.top`: home-based staging dir, remote runner runs unprivileged with `wpfy` bare and `$SUDO` only on raw non-wpfy probes.
 - Updated docs: ADR 0008, DECISION-LOG, SECURITY (operator privilege model), INSTALLER (root/sudo), CHANGELOG, MEMORY.
 - Step 2 live VPS run as `ubuntu`: full `all` run completed and evidence was pulled to `.context/vps-validation/20260604T233922Z`; wrapper self-elevation worked, but ACME failed because external port 443 timed out while the VPS listened on 443.
 - Tightened the validation harness so missing ACME certs record a validation failure and bounded curl timeouts keep blocked 443 probes short.
@@ -299,3 +767,55 @@
 - The final filesystem audit moved shared managed-site `.env` reads and compose/environment/Nginx scaffold writes to descriptor-relative no-follow operations, closing both pre-guard reads and post-validation symlink swaps across create, update, SSL, and ownership paths.
 - Verification on the working tree: 356 focused and 475 full pytest tests passed; `tests/wordpress-hardening.sh`, sdist/wheel build, type-hint import smoke, docs QA/build, Graphify refresh/query, app/docs diff checks, and the 71-finding flake8 7.3 baseline passed. Manual disposable-root QA independently reconstructed SigV4, preserved external WordPress and restore symlink sentinels, accepted a valid CLI remote restore, rejected a truncated archive before runtime stop, and removed all remote temporary files.
 - Real S3-provider interoperability and disposable-VPS create/retry/restore validation remain deferred because no provider credentials or target host were supplied. Multipart/resumable transfer, WP-CLI artifact verification, and restore expansion limits remain out of scope.
+
+## 2026-08-01 - Live-verification tour and shipped fixes
+- Completed the live-verification tour for the panel HTTP surface; the live server confirmed the shipped behavior beyond offline tests.
+- Fixed L13 FlyingPress purge to use `purge-everything`, fixed L12 cache purge reporting to preserve per-layer status and a `partial` outcome, and fixed L8 so rendered Traefik static configuration reaches the running proxy and triggers the required force-recreate.
+- Fixed L7 failed-login throttling to resolve the real client through the trusted edge, fixed L9 token handling with `--token-file` and `WPFY_PANEL_TOKEN` while warning on `--token`, and fixed L11 so disabling Redis does not leave an orphaned container.
+- Resolved L6 as a non-defect because cron timers were never installed, and kept L5 retracted because per-site cron is positively proven to run inside the site's own container.
+
+## 2026-08-05 - F2 Traefik trust sources
+
+- Replaced shared-network real-IP trust with inspected Traefik `/32` and `/128` addresses; proxied-site Cloudflare ranges now feed both real-IP and forwarded-scheme source sets.
+- Edge startup refreshes trust snippets for all managed sites and reloads only changed running nginx services. A refresh failure returns non-zero for retry.
+
+## 2026-08-02 - WP Rocket page cache served from nginx
+- Implemented the directed rocket-nginx integration: `page_cache=wp-rocket` now renders an adapted Rocket-Nginx 3.1.2 block (MIT) into `nginx/extra/wpfy-cache.conf`, so an anonymous hit is answered from WP Rocket's cache file with no PHP, WordPress or MySQL in the request path. wpfy's server-side configuration for this option was previously inert — it emitted `fastcgi_cache_bypass` directives that mean nothing without a FastCGI cache zone.
+- Kept `$wpfy_skip_cache` as the sole authority on cache eligibility rather than carrying upstream's own cookie and method conditions, so the two halves cannot drift apart across an upstream release. Dropped the pre-gzipped `.html_gzip` path so Content-Encoding is never set by hand, and dropped upstream's browser CSS/JS/media expiration blocks, which would have been matched ahead of wpfy's own security locations.
+- Fixed an inheritance hazard the change exposed: nginx drops every inherited `add_header` from a location that sets one, so the cached-page location would have served HTML without the site's security headers. The header set now has one definition in `site_layout.py` that both the vhost and the cache snippet read.
+- Added a `rocket` purge layer that deletes the cached files whether or not `wp rocket clean` succeeded, because nginx answers from those files without consulting PHP.
+- Verified against real nginx 1.27 in a container rather than only offline: `nginx -t` accepts the generated vhost, an anonymous GET returns 200 `X-Wpfy-Cache: HIT` with the cached body and the full security header set, and logged-in, comment-author, password-protected-post, POST, query-string and uncached-path requests all return `MISS` and fall through to PHP. Recorded as ADR 0029.
+- Amended two frozen L3 gate cases rather than working around them, at the user's decision after escalation. `test_byo_plugins_emit_no_status_header` rested on a premise that no longer describes `wp-rocket`; `test_snippet_opens_no_location_block` rested on a premise that still holds, but with a remedy broader than its concern. Both were narrowed to the options they still fit and replaced with gates enforcing what they stood in for. Mutation testing caught the amendment being insufficient: deleting one line — the bypass guard — left every case green while making all six bypass conditions decorative, so a gate tracing the rewrite's guard back to `$wpfy_skip_cache` was added. Gates now 256, suite 1369, 13 manifest checksums with 0 mismatches.
+
+## 2026-08-15 - Panel rebuild on Tabler: stages 5-7
+
+- Rebuilt the site-creation wizard on the real API. The old seven-step wizard never read steps 2-6: Next incremented a counter and re-rendered without touching the DOM, so every choice was discarded and Review was guaranteed to show defaults. Three steps now, bound to one state object persisted in sessionStorage, and the request body carries only the eleven fields `_post_create_site` accepts -- cache and admin keys are omitted entirely for non-WordPress flavors, which the server rejects with a 400. Multisite type, backup enablement, retention and notification channel were cut rather than collected into nothing, and the SSL step no longer claims a preflight runs: `POST /api/sites/{d}/ssl/preflight` calls `_known_domain` and 404s for a domain that does not exist yet. Success renders from `job.result`, so a run with `letsencrypt: off` says nothing about certificates, and "Manage site" points at the domain rather than the job id.
+- Built the ten admin pages and moved running operations into the shell. The Jobs list page is gone: operations live in a header popover that survives navigation, `/admin/jobs` redirects to Events (the durable record), and `/admin/jobs/<id>` keeps the full step log. The progress bar is indeterminate by construction -- `panel_jobs` appends step strings and never declares a total, so a percentage would have to invent its own denominator.
+- Added `firewall_ports.py`, host port management over `ufw`, with the two guards that matter: `enable()` allows the detected SSH port before turning the firewall on, because `ufw enable` applies default-deny the instant it runs and a rule added afterwards arrives over a connection that no longer exists; deny and delete refuse the SSH port unless forced, which the panel maps to a typed confirmation. The port is read from `sshd_config`, so a host moved off 22 is guarded where it actually listens. Verified end to end against a stub `ufw` in the browser, including the range case -- nobody reads `20:30` as "22".
+- Six defects found reviewing generated work, each fixed with a test: a create-site page whose success view buried the credentials under twenty-one absolute paths; the job-failure reason read from `job.error` when `fail_job` writes `result.error`, so every failure showed a generic string; `object_cache: "none"` sent explicitly, which the create job treats as "configure caching" and which wires the Redis backend for a site that asked for neither; the SFTP password written into `job.result` by `_runtime_payload` instead of `_sftp_payload`, leaving a credential in a payload every later `GET /api/jobs` returns in full; "unavailable" painted red on the services page, so a stopped Docker daemon showed every site as down rather than unknown; and "All sites" printed for a site-manager with an empty assignment list, who can reach none.
+- Closed three gaps found while reading the paths this touched. The 12-character password minimum was enforced only by the first-run setup form. `PUT /api/backup/remote` and `PUT /api/notifications/smtp` demanded a write-only secret on every write, so a blank field wiped a working credential. Rendering the services view cost one metrics query per site; `metrics.latest_samples()` returns the newest sample for every scope in one query and drops readings older than fifteen minutes rather than presenting a stopped site's last sample as current.
+- Sweep: zero `innerHTML`, zero inline `style=` attributes, zero inline `on*=` handlers, zero native `confirm()`, zero dead markup from the old client. Every `onPanelEvent` registration is wrapped in `ctx.onLeave`. The strict xfail on `test_gate_a_user_management_view_exists` came off on its own terms -- `/admin/users` landed, it XPASSed, strict mode failed the run.
+- Not done, and not claimed: the ufw work mutates real host state and the offline suite stubs `subprocess.run`, so it needs a validation-VPS pass before it is called done. It was deliberately not exercised against the VPS unattended -- a wrong rule ordering drops SSH and cannot be recovered from here.
+
+## 2026-08-23 - Panel account self-service and honest basic-auth state
+
+- Shipped the account surface for every signed-in panel user, not just admins. Profile editing, password change, TOTP enrollment/disable, and session revocation are keyed to the session identity: the handler reads the username from the authenticated principal and treats any client-supplied username as noise, which is what makes it safe to open these routes to site managers through an explicit allowlist rather than system scope.
+- Password rotation demands the current secret (400 on mismatch, not 401 -- the shell's api() signs out on any 401, which would kill the form mid-edit), revokes the account's other sessions, and keeps the acting one via keep_token so the user is not signed out of the tab they are typing in.
+- TOTP enrollment got the missing exit: Cancel now calls DELETE /api/auth/totp/pending, discarding the pending secret server-side. Before, closing the page left "already disclosed" until the TTL expired, so a cautious operator who thought better of enrolling could not retry without waiting.
+- Enabling TOTP changes the credential fingerprint, which invalidates every existing session by design; the account page surfaces this instead of hiding a surprise sign-out.
+- The settings page gained a Panel access card over GET/PUT/DELETE /api/settings/basic-auth. The payload carries a server-derived auth_state because stored and enforced stopped being the same thing: the router's own rendered content decides between enforced (recognized router carries exactly the stored credential), staged (verifiably not applied), stale (a router enforces a different-or-orphaned credential -- the old prompt is live even though it is not ours), and unknown (exposed but unattributable -- may still be prompting). Amber copy says exactly which, the footer stops claiming the domain is guarded when that is not known, and the third Oracle pass caught the first cut lying by omission: an orphaned router credential read as off, and a stale one read as staged.
+- Disable became convergent in both failure directions. A failed router rewrite restores the credential file byte-for-byte (including mode) so disk matches the still-enforced router and a retry repairs it; an exposed-but-unrecognized router refuses with 409 naming the cause instead of reporting success while the prompt survives out-of-band.
+- Found while reviewing generated work: the earlier convergent-disable fix still silently skipped the rewrite when domain was None, which is precisely the case where basic auth may be enforced by something wpfy does not manage. The refusal path and its regression test came out of the second Oracle pass.
+- Suite at 2168 passing; phase-7 manager-allowlist gate extended with auth.totp.cancel and its derivation comment intact.
+
+- Fourth Oracle pass moved the remaining honesty burden into the UI layer: the state mapping was extracted into panel-access-state.js, an import-free pure module so node can execute it directly from pytest. Eight view-model cases now pin what each server state tells the operator -- including that unknown hides Disable instead of offering an action the backend will refuse with 409, that orphaned stale copy never says "stored here", and that the save toast is derived from the returned auth_state rather than announcing every write as "enabled". The first cut of the module conflated "may prompt" with "has stored credential"; its own test caught it before Oracle could.
+
+- Sign-in became two steps. The password step now stands alone: accounts without TOTP get their session immediately, TOTP accounts get a single-use challenge -- opaque, client-bound, 120 seconds -- and only then does the panel ask for a code at a new public route. The combined username/password/code form keeps working for scripted clients. Oracle's first pass caught the race that mattered: lockout and throttle were checked before the final state lock but not rechecked inside it, so pre-issued challenges could slip past a lockout that landed while they waited; the recheck now sits atomically with issuance, proven by a test that establishes the lockout between the pre-check and the transaction. Challenge creation is capped globally and per user, unrelated logins drain expired challenges, the UI clears a rejected code so it cannot burn fresh challenges, and {totp: null} follows the preserved combined path because presence of the field, not its value, selects the form.
+
+## 2026-09-01 - Host-derived PHP-FPM pool sizing (ADR 0038)
+
+- Documented the PHP-FPM capacity-ceiling fix: per-site `php/zz-wpfy-pool.conf` as a second `[www]` pool section (loaded after the upstream image's stock pool files; later same-pool declarations win, so the generated file extends rather than replaces the image's pool and the stock listen socket/nginx upstreams stay untouched; written in place like `zz-wpfy.ini` because the file is bind-mounted individually) with a header pointing operators at `php/pool-custom.conf` — the operator override mounted after the generated file, never rewritten by regeneration. The pool uses `pm=ondemand` over `dynamic` specifically because wpfy runs one pool per site: dynamic's resident spare servers multiply idle workers and idle RSS by site count, while ondemand holds no workers on an idle site and still reaches the full ceiling under load. Ceilings are host-derived with no artificial caps — app memory = `min(96 MB × 4 × host CPUs, 40% of host RAM)` with a 512m floor, `pm.max_children` = memory ÷ 96 MB per worker, app CPU = host CPU count; worked values: 2 vCPU / 2468 MB → 768m / 2.00 / 8; 8 vCPU / 16 GB → 3072m / 8.00 / 32; 1 vCPU / 1 GB → 512m / 1.00 / 5. The stock `pm.max_children=5` every site previously served was the upstream image's development default wpfy had never overridden. The WP-CLI service does not mount either FPM pool file — only the app service runs the pool. Validated on the benchmark VPS (2026-09-02): the emitted app block and `zz-wpfy-pool.conf` matched the predicted 768m / 2.00 / 8 on that host shape, and the C3 loaded-uncached condition went from collapse (~53% errors, auto-aborting 3/3) to 0% errors across all three reps at 1040 ms median, with host CPU saturating at 100% and FPM reaching its full 8-worker ceiling against 67.9-84.6% peak while failing before. Cached-condition numbers from the same round are not comparable to the baseline (box ~94% idle during them, so the delta is loader.io-side variance) and are recorded as an unresolved measurement difference rather than a result. Two side defects filed: nginx stale upstream IP after a cache-toggle recreate (#54) and `wp plugin install` silently stopping partway through a list (#55).
+- Recorded the migration path: `wpfy refresh all --restart` regenerates each scaffold (adding the new file and bind mount) and recreates each site's app and web containers sequentially; each site sees a brief 502 window during its recreation. No fleet-wide simultaneous restart, no shared-edge downtime.
+- Corrected the benchmark's static attribution: `runcloud-audit/perf/SUMMARY.md` and `runcloud-audit/perf/webinoly/RESULTS.md` credited Webinoly's C3 survival to `pm=static`. The mode framing does not hold — dynamic-5 and static-6 share the same steady-state ceiling, CloudPanel survived on `ondemand` while WordOps collapsed on it — so both reports now carry a correction: the variable is throughput headroom vs. arrival rate, with wpfy's dominant term being the hardcoded 1.00-core CPU cap on top of the inherited worker count. Added a per-second telemetry coverage table (platform × condition × reps, including the Webinoly C3/C4 diagnostic-only gap from the nested-SSH sampler bug) and the capture mechanism (1 Hz systemd-unit sampler writing per-rep CSVs) to `SUMMARY.md`.
+- Updated `SITE-ISOLATION.md` with resource-limit semantics and honest limits: per-container CPU/memory ceilings bound what one site can take but are not reservations, combined limits can oversubscribe the host, and wpfy does not partition host resources. Updated `SERVER-LAYOUT.md` and `commands/site-create.md` for the new generated file.
+- Scope of this pass: documentation only — no source or test changes. No live VPS run; recreate behavior and the 502-window duration are the orchestrator's validation scope. See ADR 0038 and the DECISION-LOG entry of the same date.

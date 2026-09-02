@@ -32,7 +32,7 @@
 - Filesystem permissions.
 - Secret handling.
 - Container user review.
-- Optional fail2ban/security tooling.
+- Login Shield (implemented 2026-08-07): host Fail2ban managed by `wpfy stack install --nginx|--all|--fail2ban` (Branch C), panel login jail, per-site opt-in WordPress protection via the official wp-fail2ban plugin + WPFY bridge, WPFY Docker `DOCKER-USER` action, IPv4/IPv6 enforcement with stale-action gating. See amended ADR 0023 and `SECURITY.md`.
 
 ## Later Debian Support
 - Add Debian installer support after Ubuntu v1 is stable.

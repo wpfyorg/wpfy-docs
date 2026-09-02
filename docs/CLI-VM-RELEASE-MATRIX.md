@@ -1,12 +1,12 @@
 # WPFY CLI VM Release Matrix
 
-Updated: 2026-07-09
+Updated: 2026-08-25
 
 Source plan: `/Users/arnab/Desktop/_Projects/wpfy-pvt/.omo/plans/wpfy-cli-vm-release-five-hour-pages.md`
 
 ## Purpose
 
-This matrix maps the planned VM-release CLI surface against the current grouped CLI baseline. Page 9 locks the release policy: flat commands are primary where exact equivalents exist, and grouped `site`/`stack` commands are retained for this release instead of being removed.
+This matrix maps the planned VM-release CLI surface against the current grouped CLI baseline. Page 9 locks the release policy: flat commands are primary where exact equivalents exist, and grouped `site`/`stack` commands are retained for this release instead of being removed. Per the 2026-08-25 decision, grouped compatibility surfaces and confirmed legacy removals are deprecated in 1.0 and are not removed earlier than 1.1; each removal ships with actionable migration guidance.
 
 ## Current CLI Baseline
 
@@ -20,7 +20,7 @@ Verified from `src/wpfy/cli.py`, `pyproject.toml`, help output, and `tests/test_
 - Current stack commands: `install`, `remove`, `purge`, `migrate`, `upgrade`, `status`
 - Current log commands: `show`, `reset`, `cron`
 - Current version surface: `wpfy --version`
-- Page 9 retention target: keep grouped `stack install|remove|purge|migrate|upgrade|status`; keep grouped site-only `site ssl`, `site list`, `site info`, `site show`, and `site status`; keep duplicate grouped `site create|backup|restore|wp|delete|update` for compatibility.
+- Page 9 retention target: keep grouped `stack install|remove|purge|upgrade|status`; keep grouped site-only `site ssl`, `site list`, `site info`, `site show`, and `site status`; keep duplicate grouped `site create|backup|restore|wp|delete|update` for compatibility. `stack migrate` is deprecated in 1.0 (never implemented) and is removed no earlier than 1.1.
 - Primary flat site flows where exact equivalents exist: `run`, `backup`, `restore`, `wp`, `rm`, and `config`.
 
 ## Release Command Matrix
@@ -57,7 +57,8 @@ Verified from `src/wpfy/cli.py`, `pyproject.toml`, help output, and `tests/test_
 
 | Grouped surface | Release policy | Flat equivalent |
 |---|---|---|
-| `wpfy stack install|remove|purge|migrate|upgrade|status` | retained canonical grouped stack namespace | none |
+| `wpfy stack install|remove|purge|upgrade|status` | retained canonical grouped stack namespace | none |
+| `wpfy stack migrate` | deprecated in 1.0; removal no earlier than 1.1 (never implemented) | none |
 | `wpfy site ssl` | retained grouped site operation | none |
 | `wpfy site list` | retained grouped site operation | none |
 | `wpfy site info` | retained grouped site operation | partial: `wpfy config` is primary for sanitized config status |

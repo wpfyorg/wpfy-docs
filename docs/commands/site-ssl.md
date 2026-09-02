@@ -15,7 +15,8 @@ Enable or manage SSL for a site.
 - Implemented: for WordPress flavors, enabling SSL updates WordPress `home` and `siteurl` to `https://<domain>` and returns a non-zero result if either WP-CLI update fails.
 - Implemented: preflight, ACME state reads, case-insensitive domain matching, metadata, expiry, and renewal share the `certificate_lifecycle.py` interface.
 - Implemented: renewal confirms ACME backup creation and copy before rewrite, confirms rewrite before reload, and reports rewrite/reload partial failures truthfully while preserving the backup.
-- Implemented: enabling SSL (via `site create -le`, `site update -le`, or `site ssl --letsencrypt`) requires a valid ACME contact email before preflight runs. The effective email is the one already written to the Traefik scaffold (`traefik.yml`), else `WPFY_ACME_EMAIL`; the historical `admin@localhost` default is rejected because Let's Encrypt refuses it at registration. Fix by setting `WPFY_ACME_EMAIL=you@example.com` and re-running `wpfy stack install --nginx`.
+- Implemented: enabling SSL (via `site create -le`, `site update -le`, or `site ssl --letsencrypt`) requires a valid ACME contact email before preflight runs. The address resolves by precedence: `WPFY_ACME_EMAIL` in the environment, then the persisted stack setting, then a valid address already rendered into `traefik.yml`, then the `admin@localhost` default — which is rejected, because Let's Encrypt refuses it at registration. A re-render never downgrades a configured address to the default. Set it with `wpfy stack acme-email you@example.com`, then apply it with `wpfy stack install --nginx`; `wpfy stack acme-email` with no argument reports the current address, its source, and whether Traefik still needs the change applied.
+- Implemented: the rendered Traefik static configuration is authoritative for ACME settings. A changed ACME address is applied to the running proxy through the required force-recreate instead of being skipped because a cached hash is unchanged.
 
 ## Proxied domains (Cloudflare)
 - TLS-ALPN-01 (the default `le` resolver) cannot validate behind a proxy because the proxy
@@ -59,6 +60,9 @@ wpfy site ssl example.com --letsencrypt wildcard --dns cloudflare
 - Re-running SSL enablement keeps the site scaffold consistent and restarts runtime without deleting application data.
 
 ## Failure Modes
+- `--letsencrypt` accepts `default`, `wildcard`, or `off`; `off` is only a
+  disable mode for site create/update and is refused by this enable command.
+  `--dns` accepts only `cloudflare`.
 - ACME contact email not configured or invalid (set `WPFY_ACME_EMAIL`, re-run `wpfy stack install --nginx`).
 - DNS A/AAAA records do not point to this VPS.
 - Public IP detection fails.
