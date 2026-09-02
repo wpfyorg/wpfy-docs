@@ -1,5 +1,35 @@
 # Decision Log
 
+## 2026-09-01: Defer production SMTP alerting to v1.1; pin credential-isolation constraints
+- Decision: v1 production SMTP alerting is deferred to v1.1. SMTP stays
+  transport-only in v1: the panel stores transport settings and sends a test
+  message, and nothing sends mail when an event or failure occurs. The planned
+  v1.1 direction is global SMTP configuration with per-site propagation plus
+  event-driven alert rules. The final secrets storage and isolation design is
+  deferred to an implementation ADR, which must be written before any alerting
+  code ships. Hard constraint recorded now: production SMTP credentials must
+  not be shared directly across site containers. Recorded as ADR 0037.
+- Owner: Product maintainer.
+- Target: WPFY 1.1; implementation ADR required before any alerting code.
+- Reason: Event-driven alerting needs the operator's SMTP credential
+  reachable from a mail-sending path. The naive design — one stored
+  credential injected into every site container, or read by site PHP — puts
+  a shared secret across mutually untrusted tenants and cuts against the
+  per-site isolation model (ADR 0002). Deferring keeps the 1.0 stabilization
+  window clean while the isolation-safe credential design is worked out.
+- Alternatives: ship alerting in 1.0 with a shared credential in every site
+  container (rejected: any compromised tenant could read the transport
+  credential and send mail as the operator); defer SMTP entirely and remove
+  the transport surface (rejected: transport/test exists and is scoped —
+  alerting, not transport, is what is deferred); per-site SMTP credentials
+  only (rejected as the sole v1.1 answer: burdens the operator, though the
+  implementation ADR may include it in its option set).
+- Compatibility: no interface changes; the v1 SMTP surface is unchanged.
+- Migration: none for v1; the v1.1 implementation ADR must define
+  propagation mechanics and rollback for any credential distribution.
+- Rollback: nothing implemented to roll back.
+- Status: Accepted (scheduling; implementation deferred).
+
 ## 2026-08-25: Park FileBrowser Quantum through 1.0 stable
 - Decision: The FileBrowser Quantum file-manager integration remains disabled
   and parked through 1.0 stable. Reassessment happens at 1.1 planning. No code
@@ -605,4 +635,11 @@
 - Reason: With IPv6 off in the daemon, `docker-proxy` relayed inbound IPv6 in userland: the IPv6 ban rule sat at 0 packets while the IPv4 chain counted normally, and Traefik saw every IPv6 client as the bridge gateway `172.18.0.1`. That collapses the panel's rate-limit bucket and its sign-in throttle into one shared key, so a single IPv6 client can lock out every other IPv6 client and a ban lands on the gateway — a wider gap than the "unenforced" TODO recorded. Rules being installed has never been evidence that a packet arrives, so the claim tracks the daemon, not the ruleset.
 - Alternatives considered: hashing the Compose project name to a per-site `/64` (rejected: 65536 buckets collide at ~300 sites by the birthday bound, and a hash over an unbounded domain cannot be proven collision-free); deriving the per-site index from `SITE_UID` (rejected: `SITE_UID` is not dense from `SITE_UID_BASE`, legacy sites carry lower uids, and compose rendering would have crashed for every pre-existing site); a second per-site allocation registry (rejected: a registry that can drift from the uid registry, serving a capability no site traffic needs); reading `daemon.json` for the protection claim (rejected: the rc6 false assurance restored in the other direction); restarting Docker automatically (rejected: unannounced full-host outage mid-install); documenting IPv6 as unsupported (rejected: the address family was reachable and unprotected, not absent).
 - Consequence: Operators restart Docker once, at a time they choose, before enforcement is real; until then fail2ban status reports IPv6 degraded and names the reason. Pre-existing stacks keep IPv4-only edge networks until `ipv6-migrate --force`. Enabling IPv6 on `wpfy-panel-edge` makes Docker report two IPAM configs; `panel_edge_network_facts` required exactly one and would have hard-failed, taking `edge_bind_address` and domainless panel exposure with it — it now selects by address family, and two configs of the same family are still refused. An unrelated operator or routed ULA source is bannable; WPFY prefix and discovered edge endpoints are not. Offline tests only: the daemon accepting the merged config, an IPv6 ban dropping a packet, and Traefik reporting a real IPv6 client address all belong to the validation-day gate and are not claimed.
+- Status: Accepted.
+
+## 2026-09-01: PHP-FPM pool sizing is host-derived and delivered as a second `[www]` pool override
+- Decision: Generate a per-site `php/zz-wpfy-pool.conf` (bind-mounted read-only into the app service) that re-declares the `[www]` pool, loaded after the upstream `php:*-fpm` image's stock pool files so the generated section extends rather than replaces the image's pool — wpfy's directives win while the stock listen socket and nginx upstreams stay untouched. The pool runs `pm=ondemand`; the app memory limit is `min(96 MB × 4 × host CPU count, 40% of host RAM)` with a 512m floor and no artificial maximum, `pm.max_children` derives from that limit (96 MB per worker), and the CPU quota equals the host CPU count with no artificial cap. Worked values: 2 vCPU / 2468 MB → 768m / 2.00 / 8 workers; 8 vCPU / 16 GB → 3072m / 8.00 / 32; 1 vCPU / 1 GB → 512m (floor) / 1.00 / 5. The generated file's header points operators at `php/pool-custom.conf`, mounted after the generated override; regeneration never rewrites operator content. The WP-CLI service does not mount either FPM pool file — only the app service runs the pool. Existing sites migrate via `wpfy refresh all --restart`, which regenerates scaffolds and recreates each site's app and web containers sequentially — a brief per-site 502 window per site, disclosed as such. See ADR 0038.
+- Reason: The five-platform benchmark showed wpfy collapsing under uncached plugin-heavy load while Webinoly and CloudPanel did not. The follow-up analysis (`runcloud-audit/perf/FPM-SIZING-PLAN.md`) attributed survival to capacity headroom vs. arrival rate, not pool mode, and found wpfy's PHP tier bounded by three constants: `pm.max_children=5` inherited by accident from the upstream image's development default, a hardcoded `1.00`-core CPU cap (half the machine on the 2-vCPU benchmark host — the dominant term, missed in the benchmark write-up), and a fixed `512m` memory limit. `ondemand` was chosen over `dynamic` specifically because wpfy runs one pool per site: dynamic's resident spare servers multiply idle workers (and idle RSS) by site count, while `ondemand` holds no workers on an idle site and still reaches the full host-derived ceiling under load.
+- Alternatives considered: copy Webinoly's `pm=static` (rejected: resident workers multiplied across per-site pools, and static mode is not the survival mechanism); keep `pm=dynamic` with host-derived ceilings (rejected: dynamic's resident spare servers are what per-site pools should not hold on a multi-site host — ondemand gives the same ceiling without the multiplied idle footprint); keep fixed ceilings and only add the override file (rejected: the CPU cap was the dominant term, so the file would republish development defaults); nginx-level concurrency limiting or queue bounding (rejected: unnecessary once the pool is sized, adds a failure mode).
+- Consequence: Site PHP capacity scales with the host instead of silently inheriting a development default; larger per-site allocations reduce sites-per-box density and that trade is visible in the scaffold. Limits stay per-container ceilings, not reservations — combined limits can oversubscribe the host and wpfy does not partition host resources (disclosed in `SITE-ISOLATION.md`). The benchmark reports' static-attribution framing is corrected in `runcloud-audit/perf/SUMMARY.md` and `runcloud-audit/perf/webinoly/RESULTS.md`. No live VPS validation is claimed; recreate behavior and the 502 window are the orchestrator's validation scope.
 - Status: Accepted.

@@ -1,5 +1,78 @@
 # Worklog
 
+## 2026-09-01 — Docs pass: rc8 checklist alignment and SMTP alerting scope decision
+
+Documentation-only pass; no scripts or code changed. Validation owner:
+parent orchestrator.
+
+- RELEASE-NOTES-rc8.md: the live-validation checklist now names the supported
+  `scripts/vps-release-validation.sh` defaults (`ubuntu@43.205.111.80`,
+  `m.wpfydev.top`) instead of the ad-hoc dual-stack host/address, and
+  documents the script's supported `--target`/`--domain-base` override
+  invocation as the required path for the intended dual-stack host (the IPv6
+  ban test needs one). A dated line states no live validation has occurred
+  and no checklist item is claimed as passed.
+- Decision recorded: v1 production SMTP alerting deferred to v1.1 (ADR 0037).
+  Planned direction: global SMTP configuration with per-site propagation plus
+  event-driven alert rules. Final secrets storage/isolation design deferred
+  to an implementation ADR required before any alerting code ships. Hard
+  constraint: production SMTP credentials must not be shared directly across
+  site containers.
+- Files changed: wpfy-pvt `RELEASE-NOTES-rc8.md`, `ROADMAP.md`,
+  `CHANGELOG.md` (Unreleased/Decisions); wpfy-docs `DECISION-LOG.md` (new
+  top entry), `adr/0037-smtp-alerting-scope-and-credential-isolation.md`
+  (new), `MEMORY.md` (Planned/Deferred + Latest Decisions), this worklog.
+
+## 2026-08-25 (follow-up) — Installer staged-release activation and source redaction
+
+Implementation pass on the installers plus a disposable Ubuntu/VPS rerun;
+docs recorded in CHANGELOG, MEMORY, and HANDOFF the same day. Uncommitted at
+documentation time.
+
+- Archive source values no longer log: download/copy failures print generic
+  messages with curl/cp diagnostics suppressed, and the bootstrap log line
+  names only the ref — an archive URL may carry private tokens or signed
+  query parameters.
+- Repeated bootstrap reuses the symlinked venv: `python3 -m venv` cannot
+  create through a symlink, so the root installer now validates the target
+  interpreter and logs the reuse instead.
+- Activation is release-local: when a versioned layout is active and the
+  bundled installer stages a fresh physical app tree, it moves to
+  `releases/release-<stamp>/app`, the release links the existing active venv
+  (`../<previous>/venv`) or moves a physical one, pip reinstalls wpfy
+  editable against the release's own tree (a reused venv's editable metadata
+  records the pre-move source location), and `import wpfy` must resolve to
+  that release's `app/src` before `current` is repointed. Rollback is
+  repair-first once the editable reinstall has run against a venv shared
+  with the previous release: the shared interpreter reinstalls wpfy editable
+  against the previous release's own app, and the partial release is deleted
+  only after that repair succeeds, leaving the previous release usable
+  behind canonical root links. If the repair itself fails, the staged
+  release is deliberately kept — it then holds the only source tree the
+  shared venv still resolves to — and the installer prints exact manual
+  recovery guidance: run `pip install -e` against the previous release's app
+  with the shared interpreter, delete the retained release, and rerun the
+  installer. Failures before any shared-venv mutation (staged-app relink,
+  missing `src/`) keep the plain delete path. The repair interpreter is
+  built only after resolving the shared-venv symlink to its target; a
+  dangling or unusable target refuses the repair — keeping the staged
+  release — and never falls back to host `/bin/python`.
+- VPS evidence: redaction probe passed. The initial rerun exposed two
+  defects — venv creation attempted through the symlinked venv path and an
+  activation path bug — both discovered with the previous release left
+  active by the rollback, then fixed. The final repeat bootstrap exited 0:
+  `current` moved to `release-20260825055831-21347`, root links are
+  `current/app` and `current/venv`, the Python import resolves to the new
+  release's `app/src`, and the wrapper version ran.
+- Final full pytest for this follow-up: 2277 passed. Offline installer
+  coverage grew to 27 passing checks in `tests/installer-idempotency.sh`
+  (exit 0 locally), including shared-venv import and pip failure paths,
+  repair-before-delete ordering, the failed-repair retention path with
+  recovery guidance, and a dangling shared-venv symlink regression
+  (interpreter guessing refused, staged release kept).
+- Not performed: root/Docker-mutating shell tests, independent installer
+  review, live VPS rerun of the repair-first rollback.
+
 ## 2026-08-25 (final) — Disposable-VPS installer gate closed (W4-11)
 
 Validation pass on the disposable Ubuntu VPS; docs recorded in CHANGELOG,
@@ -662,3 +735,11 @@ serving 200.
 - Fourth Oracle pass moved the remaining honesty burden into the UI layer: the state mapping was extracted into panel-access-state.js, an import-free pure module so node can execute it directly from pytest. Eight view-model cases now pin what each server state tells the operator -- including that unknown hides Disable instead of offering an action the backend will refuse with 409, that orphaned stale copy never says "stored here", and that the save toast is derived from the returned auth_state rather than announcing every write as "enabled". The first cut of the module conflated "may prompt" with "has stored credential"; its own test caught it before Oracle could.
 
 - Sign-in became two steps. The password step now stands alone: accounts without TOTP get their session immediately, TOTP accounts get a single-use challenge -- opaque, client-bound, 120 seconds -- and only then does the panel ask for a code at a new public route. The combined username/password/code form keeps working for scripted clients. Oracle's first pass caught the race that mattered: lockout and throttle were checked before the final state lock but not rechecked inside it, so pre-issued challenges could slip past a lockout that landed while they waited; the recheck now sits atomically with issuance, proven by a test that establishes the lockout between the pre-check and the transaction. Challenge creation is capped globally and per user, unrelated logins drain expired challenges, the UI clears a rejected code so it cannot burn fresh challenges, and {totp: null} follows the preserved combined path because presence of the field, not its value, selects the form.
+
+## 2026-09-01 - Host-derived PHP-FPM pool sizing (ADR 0038)
+
+- Documented the PHP-FPM capacity-ceiling fix: per-site `php/zz-wpfy-pool.conf` as a second `[www]` pool section (loaded after the upstream image's stock pool files; later same-pool declarations win, so the generated file extends rather than replaces the image's pool and the stock listen socket/nginx upstreams stay untouched; written in place like `zz-wpfy.ini` because the file is bind-mounted individually) with a header pointing operators at `php/pool-custom.conf` — the operator override mounted after the generated file, never rewritten by regeneration. The pool uses `pm=ondemand` over `dynamic` specifically because wpfy runs one pool per site: dynamic's resident spare servers multiply idle workers and idle RSS by site count, while ondemand holds no workers on an idle site and still reaches the full ceiling under load. Ceilings are host-derived with no artificial caps — app memory = `min(96 MB × 4 × host CPUs, 40% of host RAM)` with a 512m floor, `pm.max_children` = memory ÷ 96 MB per worker, app CPU = host CPU count; worked values: 2 vCPU / 2468 MB → 768m / 2.00 / 8; 8 vCPU / 16 GB → 3072m / 8.00 / 32; 1 vCPU / 1 GB → 512m / 1.00 / 5. The stock `pm.max_children=5` every site previously served was the upstream image's development default wpfy had never overridden. The WP-CLI service does not mount either FPM pool file — only the app service runs the pool. Validated on the benchmark VPS (2026-09-02): the emitted app block and `zz-wpfy-pool.conf` matched the predicted 768m / 2.00 / 8 on that host shape, and the C3 loaded-uncached condition went from collapse (~53% errors, auto-aborting 3/3) to 0% errors across all three reps at 1040 ms median, with host CPU saturating at 100% and FPM reaching its full 8-worker ceiling against 67.9-84.6% peak while failing before. Cached-condition numbers from the same round are not comparable to the baseline (box ~94% idle during them, so the delta is loader.io-side variance) and are recorded as an unresolved measurement difference rather than a result. Two side defects filed: nginx stale upstream IP after a cache-toggle recreate (#54) and `wp plugin install` silently stopping partway through a list (#55).
+- Recorded the migration path: `wpfy refresh all --restart` regenerates each scaffold (adding the new file and bind mount) and recreates each site's app and web containers sequentially; each site sees a brief 502 window during its recreation. No fleet-wide simultaneous restart, no shared-edge downtime.
+- Corrected the benchmark's static attribution: `runcloud-audit/perf/SUMMARY.md` and `runcloud-audit/perf/webinoly/RESULTS.md` credited Webinoly's C3 survival to `pm=static`. The mode framing does not hold — dynamic-5 and static-6 share the same steady-state ceiling, CloudPanel survived on `ondemand` while WordOps collapsed on it — so both reports now carry a correction: the variable is throughput headroom vs. arrival rate, with wpfy's dominant term being the hardcoded 1.00-core CPU cap on top of the inherited worker count. Added a per-second telemetry coverage table (platform × condition × reps, including the Webinoly C3/C4 diagnostic-only gap from the nested-SSH sampler bug) and the capture mechanism (1 Hz systemd-unit sampler writing per-rep CSVs) to `SUMMARY.md`.
+- Updated `SITE-ISOLATION.md` with resource-limit semantics and honest limits: per-container CPU/memory ceilings bound what one site can take but are not reservations, combined limits can oversubscribe the host, and wpfy does not partition host resources. Updated `SERVER-LAYOUT.md` and `commands/site-create.md` for the new generated file.
+- Scope of this pass: documentation only — no source or test changes. No live VPS run; recreate behavior and the 502-window duration are the orchestrator's validation scope. See ADR 0038 and the DECISION-LOG entry of the same date.

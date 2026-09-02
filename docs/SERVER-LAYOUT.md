@@ -18,7 +18,7 @@
 - `/opt/wpfy/sites/<site>/.env`
 - `/opt/wpfy/sites/<site>/app/healthz.html`
 - `/opt/wpfy/sites/<site>/nginx/`
-- `/opt/wpfy/sites/<site>/php/`
+- `/opt/wpfy/sites/<site>/php/` — includes the generated `php/zz-wpfy-pool.conf` `[www]` pool section and the operator-editable `php/pool-custom.conf` (ADR 0038) next to `php/zz-wpfy.ini` and `php/custom.ini`; all are bind-mounted read-only into the app service only (the WP-CLI service mounts none of the FPM pool files), generated files are updated in place, operator files are never rewritten.
 - `/opt/wpfy/sites/<site>/backups/` is no longer the backup target; backups live under `/var/lib/wpfy/backups/<site>/`.
 
 ## Constraints

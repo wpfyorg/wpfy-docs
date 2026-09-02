@@ -49,7 +49,17 @@ printf '%s\n' "$WPFY_ADMIN_PASSWORD" | wpfy site create example.com --wp --pass 
 - Implemented: `/opt/wpfy/sites/<domain>/.env`.
 - Implemented: `/opt/wpfy/sites/<domain>/nginx/`, `/opt/wpfy/sites/<domain>/php/`, `/opt/wpfy/sites/<domain>/backups/`, and `/opt/wpfy/sites/<domain>/app/`.
 - Implemented: `/opt/wpfy/sites/<domain>/nginx/default.conf` and `/opt/wpfy/sites/<domain>/app/healthz.html`.
+- Implemented: `/opt/wpfy/sites/<domain>/php/zz-wpfy-pool.conf` — generated PHP-FPM `[www]` pool section, bind-mounted read-only into the app container and rewritten in place (never inode-swapped); sized host-derived per ADR 0038.
+- Implemented: `/opt/wpfy/sites/<domain>/php/pool-custom.conf` — operator override file (mounted after the generated pool), created/pointed to by the generated file's header and never rewritten by regeneration.
 - Implemented: registry metadata under `/var/lib/wpfy/sites.json`.
+
+## PHP-FPM Pool Sizing
+- Implemented: the site pool is generated as `php/zz-wpfy-pool.conf`, a second `[www]` pool section loaded after the upstream image's stock pool files; PHP-FPM applies later same-pool declarations over earlier ones, so the generated file extends rather than replaces the image's pool and the stock listen socket (and nginx upstream) is untouched.
+- Implemented: `pm=ondemand` — with one pool per site, dynamic's resident spare servers would multiply idle workers and idle RSS by site count; ondemand holds no workers on an idle site and still reaches the full ceiling under load.
+- Implemented: host-derived ceilings with no artificial caps — the app container's memory limit is `min(96 MB × 4 × host CPU count, 40% of host RAM)` with a 512m floor, `pm.max_children` derives from that limit at 96 MB per worker, and the app CPU quota equals the host CPU count. Worked values: 2 vCPU / 2468 MB → 768m / 2.00 / 8 workers; 8 vCPU / 16 GB → 3072m / 8.00 / 32; 1 vCPU / 1 GB → 512m / 1.00 / 5.
+- Implemented: operators override individual pool values in `php/pool-custom.conf` (named in the generated file's header); regeneration rewrites `zz-wpfy-pool.conf` but never touches `pool-custom.conf` content.
+- Implemented: the WP-CLI service does not mount either FPM pool file — only the app service runs the pool.
+- Implemented: sites created before this file existed adopt it through `wpfy refresh <domain> --restart` (or `wpfy refresh all --restart`, which processes sites sequentially with a brief per-site 502 window while each site's app and web containers are recreated).
 
 ## Idempotency Behaviour
 - Implemented for files and directories: re-running with the same inputs updates only changed scaffold files and reuses existing directories.

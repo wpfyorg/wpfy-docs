@@ -5,6 +5,40 @@
 - Target install UX: `curl -fsSL https://raw.githubusercontent.com/wpfyorg/wpfy/main/install.sh | sudo bash`.
 
 ## Implemented
+- Host-derived PHP-FPM pool sizing (2026-09-01, docs scope; validation
+  owner: orchestrator): every managed site now generates
+  `php/zz-wpfy-pool.conf` — a second `[www]` pool section loaded after the
+  upstream image's stock pool files (later same-pool declarations win, so
+  the generated file extends rather than replaces the image's pool and the
+  stock listen socket/nginx upstreams stay untouched), written in place
+  like `zz-wpfy.ini` because it is bind-mounted individually, with a header
+  pointing operators at `php/pool-custom.conf` — the operator override
+  mounted after the generated file, never rewritten by regeneration. The
+  pool uses `pm=ondemand` over `dynamic` specifically because wpfy runs one
+  pool per site: dynamic's resident spare servers multiply idle workers and
+  idle RSS by site count, while ondemand holds no workers on an idle site
+  and still reaches the full ceiling under load. Ceilings are host-derived
+  with no artificial caps: app memory = `min(96 MB × 4 × host CPUs, 40% of
+  host RAM)` with a 512m floor, `pm.max_children` = memory ÷ 96 MB per
+  worker, app CPU = host CPU count. Worked values: 2 vCPU / 2468 MB →
+  768m / 2.00 / 8 workers; 8 vCPU / 16 GB → 3072m / 8.00 / 32; 1 vCPU /
+  1 GB → 512m / 1.00 / 5. Previously every site inherited the upstream
+  image's development default `pm.max_children=5`. The WP-CLI service does
+  not mount either FPM pool file — only the app service runs the pool.
+  Migration is `wpfy refresh all --restart`: sequential scaffold
+  regeneration plus app+web container recreation, a brief per-site 502
+  window per site. Rationale and alternatives in ADR 0038; benchmark
+  attribution correction (capacity headroom, not `pm=static` mode) recorded
+  in `runcloud-audit/perf/SUMMARY.md` and
+  `runcloud-audit/perf/webinoly/RESULTS.md`.
+  Validated on the benchmark VPS (2026-09-02): emits 768m / 2.00 / 8 workers
+  on the 2 vCPU / 2468 MB box, and the C3 loaded-uncached condition that
+  previously collapsed (~53% errors, auto-aborting all three reps) completed
+  3/3 at 0% errors, 1040 ms median, with host CPU at 100% and FPM at its full
+  8-worker ceiling (baseline peaked at only 67.9-84.6% while failing). Under
+  load the app container used ~98 MiB of its 768 MiB limit, so the 96 MB
+  per-worker divisor is ~8x conservative and CPU is the binding constraint at
+  this host size. Results in `runcloud-audit/perf/wpfy-v2/`.
 - Ponytail W1 mechanical batches completed (2026-08-25, local evidence only;
   validation owner: orchestrator): W1-02 `try/except X: pass` →
   `contextlib.suppress(X)` across `site_layout.py`, `site_security.py`,
@@ -37,6 +71,41 @@
   its flock file from `settings.PATHS.state_dir` at call time); targeted
   rerun 4 passed. Not performed: root/Docker-mutating shell tests,
   independent installer review.
+- Installer follow-up (2026-08-25, uncommitted at documentation time):
+  archive source values never log — download/copy failures are generic with
+  tool diagnostics suppressed and the bootstrap line names only the ref
+  (archive URLs may carry private tokens or signed query parameters);
+  repeated bootstrap reuses the symlinked venv (root installer validates the
+  target interpreter instead of running `python3 -m venv` through the
+  symlink); activation stages a release-local editable install — staged app
+  moves to `releases/release-<stamp>/app`, the release links the existing
+  active venv via `../<previous>/venv` (or moves a physical one), pip
+  reinstalls editable against the release's own tree because a reused venv's
+  editable metadata records the pre-move path, and `import wpfy` must
+  resolve to that release's `app/src` before `current` is repointed; once a
+  rollback follows an editable reinstall against a venv shared with the
+  previous release, the shared interpreter first repairs that venv back to
+  the previous release's own app and only a successful repair deletes the
+  partial release (previous release stays usable behind canonical root
+  links); if the repair fails, the staged release is deliberately retained —
+  it holds the only source tree the shared venv still resolves to — and the
+  installer prints exact manual recovery steps (pip reinstall against the
+  previous app, delete the retained release, rerun); the repair interpreter
+  is built only after resolving the shared-venv symlink target, and a
+  dangling or unusable target refuses the repair (staged release retained)
+  rather than falling back to host `/bin/python`. VPS
+  evidence: redaction probe passed; initial rerun exposed a venv-symlink
+  defect and an activation path defect, both restored with the previous
+  release left active; final repeat bootstrap exit 0 — `current` →
+  `release-20260825055831-21347`, root links `current/app` and
+  `current/venv`, import resolves to the new release's `app/src`, wrapper
+  version runs. Final full pytest for this follow-up: 2277 passed; offline
+  installer coverage is now 27 passing checks in
+  `tests/installer-idempotency.sh` (shared-venv import/pip failures,
+  repair-before-delete ordering, failed-repair retention with recovery
+  guidance, dangling shared-venv symlink regression); no root/Docker-mutating
+  shell tests; no independent installer review; no live VPS rerun of the
+  repair-first rollback.
 - Panel rebuild on Tabler (2026-08-15, ADR 0032): the loopback panel client is
   rebuilt from scratch on vendored Tabler 1.4.0. Site detail is five tabs
   (Overview, Settings, Data, Access, Automation) with the old fourteen paths
@@ -123,7 +192,7 @@
 - Root installer script `wpfy` bootstraps Ubuntu hosts, installs or verifies Docker and the Compose plugin, creates core directories, syncs the source tree, installs `wpfy` into `/opt/wpfy/venv`, exposes `/usr/local/bin/wpfy`, writes `/etc/wpfy/wpfy.conf`, and runs smoke checks.
 - Root installer source updates are staged through `/opt/wpfy/app.next`; the previous app tree is retained as `/opt/wpfy/app.previous` and restored if a later install step fails.
 - The public bootstrap migrates legacy unversioned `/opt/wpfy/app` and `/opt/wpfy/venv` into `/opt/wpfy/releases/legacy-<stamp>/` behind an `/opt/wpfy/current` symlink, and the bundled installer verifies the installed `wpfy` import resolves to the staged source instead of pip-installing (2026-08-25, VPS-evidenced; see the W4-11 batch note above).
-- Public bootstrap script `install.sh` downloads the GitHub source archive for `WPFY_REF` (default `main`), optionally verifies it with `WPFY_SOURCE_SHA256`, and runs the bundled `wpfy` installer with `--skip-wpfy-install`.
+- Public bootstrap script `install.sh` downloads the GitHub source archive for `WPFY_REF` (default `main`), optionally verifies it with `WPFY_SOURCE_SHA256`, and runs the bundled `wpfy` installer in full; it does not pass `--skip-wpfy-install`, which only skips the bundled installer's source verification.
 - Public release export script `scripts/export-public.sh` copies only `.gitignore`, `LICENSE`, `README.md`, `install.sh`, `pyproject.toml`, `wpfy`, `src/`, public-safe `tests/`, `docker/`, and `.github/workflows/php-images.yml` into a separate public checkout under `.context/public-export/wpfy`. It supports a new-root export and rejects internal paths and known infrastructure identifiers.
 - Disposable-VPS validation tooling now exists as `scripts/vps-release-validation.sh` for local packaging/staging and `scripts/vps-release-validation-remote.sh` for numbered evidence capture on the target VPS.
 - VPS validation runner HTTP probes now use HTTP for non-SSL sites and HTTPS only for SSL-enabled sites; post-restore status/Compose evidence is captured after successful and rejected restore attempts.
@@ -237,6 +306,12 @@
 - Panel basic auth is manageable from Settings: `GET/PUT/DELETE /api/settings/basic-auth` with a server-derived `auth_state` (`enforced`/`staged`/`stale`/`unknown`/`off`) read from the router's own content — `stale` covers both a mismatched credential and an orphaned one (router prompts while nothing is stored); disable restores the credential on router-rewrite failure and refuses (409) when the panel is exposed but no managed router is recognized.
 
 ## Planned / Deferred
+- Event-driven SMTP alerting (v1.1, ADR 0037, 2026-09-01): planned direction
+  is global SMTP configuration with per-site propagation plus event-driven
+  alert rules; final secrets storage/isolation design is deferred to an
+  implementation ADR required before any alerting code ships; production SMTP
+  credentials must not be shared directly across site containers. v1 stays
+  transport-only (stored transport plus explicit test sends).
 - WordPress Multisite (scheduled 1.1, ADR 0035): both subdirectory and
   subdomain modes; subdomain requires a Cloudflare DNS wildcard record plus a
   passing wildcard TLS preflight before any mutation; network children share
@@ -276,6 +351,10 @@
 - VitePress docs preview convention: from the docs repository, use `npm run docs:preview -- --host 127.0.0.1 --port 4173` after `npm run docs:build`.
 
 ## Latest Decisions
+- 2026-09-01: Production SMTP alerting deferred to v1.1 (ADR 0037); planned
+  direction global SMTP config with per-site propagation; secrets
+  storage/isolation design deferred to an implementation ADR; production SMTP
+  credentials must not be shared directly across site containers.
 - 2026-08-25: Quantum stays disabled/parked through 1.0 stable, reassessed at
   1.1 planning; no code deleted. ADR 0031 amended.
 - 2026-08-25: Multisite scheduled for 1.1 with both modes (ADR 0035);
